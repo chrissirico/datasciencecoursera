@@ -123,3 +123,8 @@ reorder_size <- function(x) {
   factor(x, levels = names(sort(table(x))))
 }
 ggplot(mpg, aes(reorder_size(class))) + geom_bar()
+
+
+
+
+
