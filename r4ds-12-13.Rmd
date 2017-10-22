@@ -371,7 +371,7 @@ mutate(flights,
        id = row_number()) %>%
   select(id, everything())
 ```
-1.  **Identify the keys in the following datasets
+2.  **Identify the keys in the following datasets
     (You might need to install some packages and read some documentation.)**
 
     1.  `Lahman::Batting` -- playerID, yearID, stint
@@ -380,7 +380,7 @@ mutate(flights,
     1.  `fueleconomy::vehicles` -- id (yay!)
     1.  `ggplot2::diamonds` -- HA HA! trick question. Some observations are exactly identical.
     
-1.  **Draw a diagram illustrating the connections between the `Batting`,
+3.  **Draw a diagram illustrating the connections between the `Batting`,
     `Master`, and `Salaries` tables in the Lahman package. Draw another diagram
     that shows the relationship between `Master`, `Managers`, `AwardsManagers`.**
     
@@ -417,7 +417,7 @@ flights3 %>%
     You might want to use the `size` or `colour` of the points to display
     the average delay for each airport.**
 
-1.  **Add the location of the origin _and_ destination (i.e. the `lat` and `lon`)
+2.  **Add the location of the origin _and_ destination (i.e. the `lat` and `lon`)
     to `flights`.**
     
 ```{r}
@@ -425,7 +425,7 @@ flights %>%
 left_join(airports, by = c("dest" = "faa"), suffix = c(".d",".o")) %>%
 left_join(airports, by = c("origin" = "faa"), suffix = c(".d", ".o"))
 ```
-1.  Is there a relationship between the age of a plane and its delays?
+3.  Is there a relationship between the age of a plane and its delays?
 ```{r}
 flights %>% group_by(tailnum) %>%
   summarise(arr_delay = mean(arr_delay, na.rm=T)) %>% 
@@ -437,19 +437,28 @@ flights %>% group_by(tailnum) %>%
 ```
 Planes seem to have slightly more delays at their 10-year-old phase, although that may have to do with outliers clustering around the densest area of airplane age.
 
-1.  What weather conditions make it more likely to see a delay?
+4.  What weather conditions make it more likely to see a delay?
 
 ```{r}
 flights %>% group_by(origin, year, month, day, hour) %>%
   summarise(dep_delay = mean(dep_delay, na.rm=T)) %>% 
   left_join(weather, by = c("year", "month", "day", "hour", "origin")) %>% 
-  ggplot()+
-  geom_point(aes(dep_delay, visib), alpha=.05)
+    ggplot(aes(x=dep_delay))+
+  geom_point(aes(y=temp), color="black", alpha=.05) +
+  geom_point(aes(y=dewp), color="yellow", alpha=.05) +
+  geom_point(aes(y=humid), color="orange", alpha=.05) +
+  geom_point(aes(y=wind_dir), color="purple", alpha=.05) +
+  geom_point(aes(y=wind_speed), color="magenta", alpha=.05) +
+  geom_point(aes(y=wind_gust), color="cyan", alpha=.05) +
+  geom_point(aes(y=precip), color="green", alpha=.1) +
+  geom_point(aes(y=pressure), color="blue", alpha=.1) +
+  geom_point(aes(y=visib), color="red", alpha=.1)
+
 
 ```
 Hours with lower visibilities seem to have a higher proportion of delays.
 
-1.  **What happened on June 13 2013? Display the spatial pattern of delays,
+5.  **What happened on June 13 2013? Display the spatial pattern of delays,
     and then use Google to cross-reference with the weather.**
   
 ```{r}
