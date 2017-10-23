@@ -15,6 +15,7 @@ library(maps)
 library(Lahman)
 library(nasaweather)
 library(babynames)
+library(fueleconomy)
 ```
 
 ## 12.2.1
@@ -30,7 +31,7 @@ library(babynames)
     
 `table4a / table4b` These tables don't have a column for the variables `cases` and `population`, but rather split them between tables, which makes it harder to calculate rate. 
     
-1.  **Compute the `rate` for `table2`, and `table4a` + `table4b`. 
+2.  **Compute the `rate` for `table2`, and `table4a` + `table4b`. 
     You will need to perform four operations:**
 
     1.  Extract the number of TB cases per country per year.
@@ -104,7 +105,7 @@ new_df <- tibble(
     
     `table1` would've been the easiest because it's tidy! `table2` was easier than tables `4a` and `4b` because all the data was in the same place.
 
-**1.  Recreate the plot showing change in cases over time using `table2` instead of `table1`. What do you need to do first?**
+**3.  Recreate the plot showing change in cases over time using `table2` instead of `table1`. What do you need to do first?**
 
   We need to filter out "population" rows from column `type` so we're left with only count.
 
@@ -198,7 +199,7 @@ Spread deletes year, thus erasing its position in the column order. Gather reint
 `convert = TRUE` allows `spread` to automatically create variables of a type appropriate to the contents.
 
 
-1.  **Why does this code fail?**
+2.  **Why does this code fail?**
 
 ```{r, error = TRUE}
     table4a %>% 
@@ -207,10 +208,10 @@ Spread deletes year, thus erasing its position in the column order. Gather reint
 
   Years are non-syntactic and must be escaped with backticks.
 
-1.  **Why does spreading this tibble fail? How could you add a new column to fix
+3.  **Why does spreading this tibble fail? How could you add a new column to fix
     the problem?**
 
-```{r}
+```{r eval = FALSE}
     people <- tribble(
       ~name,             ~key,    ~value,
       #-----------------|--------|------
@@ -226,7 +227,7 @@ Spread deletes year, thus erasing its position in the column order. Gather reint
 
 There is no differentiating variable for Phillip Woods' two age observations. We could add a column with the year, an ID or something similar.
 
-1.  **Tidy the simple tibble below. Do you need to spread or gather it?
+4.  **Tidy the simple tibble below. Do you need to spread or gather it?
     What are the variables?**
 
 ```{r}
@@ -257,12 +258,12 @@ There is no differentiating variable for Phillip Woods' two age observations. We
       separate(x, c("one", "two", "three"), fill = "left", remove = F)
     ```
 
-1.  **Both `unite()` and `separate()` have a `remove` argument. What does it
+2.  **Both `unite()` and `separate()` have a `remove` argument. What does it
     do? Why would you set it to `FALSE`?**
     
     You can preserve the orginal column and split the output to additional columns if you want to munge non-destructively.
 
-1.  **Compare and contrast `separate()` and `extract()`.  Why are there
+3.  **Compare and contrast `separate()` and `extract()`.  Why are there
     three variations of separation (by position, by separator, and with
     groups), but only one unite?**
     
@@ -286,7 +287,7 @@ df %>% extract(x, c("A", "B"), "([a-d]+)-([a-d]+)")
 `complete` takes similar arguments, but makes all missing value combinations explicit.
 `spread` takes the dataset, a column whose values should become column names, and the column whose values should be spread below the new columns.
 
-1.  **What does the direction argument to `fill()` do?**
+2.  **What does the direction argument to `fill()` do?**
 It tells the function whether to pull values `down` or `up` into NA cells. Default is `down`.
 
 ## 12.6.1 Exercises
@@ -299,15 +300,15 @@ who %>%
   separate(sexage, c("sex", "age"), sep = 1)
 ```
 
-1.  **In this case study I set `na.rm = TRUE` just to make it easier to check that we had the correct values. Is this reasonable? Think about how missing values are represented in this dataset. Are there implicit missing values? What's the difference between an `NA` and zero?**
+3.  **In this case study I set `na.rm = TRUE` just to make it easier to check that we had the correct values. Is this reasonable? Think about how missing values are represented in this dataset. Are there implicit missing values? What's the difference between an `NA` and zero?**
 
 Leaving the missing values in gives a clearer picture of what is and is not present. NA shows that the measurements weren't taken. Zero would imply that the statistic was measured and there were no cases. It doesn't look like there are any implicit missing values until we gather with na.rm = TRUE.
 
-1.  **What happens if you neglect the `mutate()` step?
+4.  **What happens if you neglect the `mutate()` step?
     (`mutate(key = stringr::str_replace(key, "newrel", "new_rel"))`)**
     newrel gets separated into the `new` column and then omitted from the data with the select function.
 
-1.  **I claimed that `iso2` and `iso3` were redundant with `country`. 
+5.  **I claimed that `iso2` and `iso3` were redundant with `country`. 
     Confirm this claim.**
     Counting the number of occurences of each name yields the same results:
 ``` {r}
@@ -315,7 +316,7 @@ Leaving the missing values in gives a clearer picture of what is and is not pres
     count(who, iso2)
     count(who, country)
 ```
-1.  For each country, year, and sex compute the total number of cases of TB. Make an informative visualisation of the data.
+6.  For each country, year, and sex compute the total number of cases of TB. Make an informative visualisation of the data.
 ```{r}
 who %>%
   gather(code, value, new_sp_m014:newrel_f65, na.rm = TRUE) %>% 
@@ -344,18 +345,18 @@ who %>%
     would you need to combine?**
     One would need all combinations of origin and destination as well as the lat/longs of those airports. You'd have to join airports and flights.
 
-1.  **I forgot to draw the relationship between `weather` and `airports`.
+2.  **I forgot to draw the relationship between `weather` and `airports`.
     What is the relationship and how should it appear in the diagram?**
     
     Weather origin would connect to airports `faa`.
 
-1.  **`weather` only contains information for the origin (NYC) airports. If
+3.  **`weather` only contains information for the origin (NYC) airports. If
     it contained weather records for all airports in the USA, what additional
     relation would it define with `flights`?**
     
     Destination
 
-1.  **We know that some days of the year are "special", and fewer people than
+4.  **We know that some days of the year are "special", and fewer people than
     usual fly on them. How might you represent that data as a data frame?
     What would be the primary keys of that table? How would it connect to the
     existing tables?**
@@ -425,38 +426,53 @@ flights %>%
 left_join(airports, by = c("dest" = "faa"), suffix = c(".d",".o")) %>%
 left_join(airports, by = c("origin" = "faa"), suffix = c(".d", ".o"))
 ```
+
 3.  Is there a relationship between the age of a plane and its delays?
-```{r}
+
+```{r warnings = F}
 flights %>% group_by(tailnum) %>%
   summarise(arr_delay = mean(arr_delay, na.rm=T)) %>% 
   left_join(planes, by = c("tailnum")) %>%
   mutate(age = 2013 - year) %>%
   ggplot(aes(age, arr_delay)) +
-  geom_point(alpha=.2, na.rm = T) +
-  geom_smooth()
+  geom_boxplot(aes(group = cut_width(age, 1), outlier.alpha=.2, na.rm = T)) 
 ```
 Planes seem to have slightly more delays at their 10-year-old phase, although that may have to do with outliers clustering around the densest area of airplane age.
 
 4.  What weather conditions make it more likely to see a delay?
 
-```{r}
-flights %>% group_by(origin, year, month, day, hour) %>%
-  summarise(dep_delay = mean(dep_delay, na.rm=T)) %>% 
-  left_join(weather, by = c("year", "month", "day", "hour", "origin")) %>% 
-    ggplot(aes(x=dep_delay))+
-  geom_point(aes(y=temp), color="black", alpha=.05) +
-  geom_point(aes(y=dewp), color="yellow", alpha=.05) +
-  geom_point(aes(y=humid), color="orange", alpha=.05) +
-  geom_point(aes(y=wind_dir), color="purple", alpha=.05) +
-  geom_point(aes(y=wind_speed), color="magenta", alpha=.05) +
-  geom_point(aes(y=wind_gust), color="cyan", alpha=.05) +
-  geom_point(aes(y=precip), color="green", alpha=.1) +
-  geom_point(aes(y=pressure), color="blue", alpha=.1) +
-  geom_point(aes(y=visib), color="red", alpha=.1)
+Visibility, precipitation and barrometric pressure all seem to have effects.
 
+```{r}
+flights %>% 
+    left_join(weather, by = c("origin", "year", "month", "day", "hour" )) %>% 
+    gather("weather_metric", "value", temp:visib) %>% 
+    ggplot(aes(value, dep_delay)) +
+    geom_point(alpha = .02, size = .5, na.rm=T) +
+    facet_wrap(~weather_metric, scales = "free")
+```
+
+Let's explore the distribution of delays within barrometric pressure:
+
+```{r}
+# box plot pressure
+flights %>% 
+    left_join(weather, by = c("origin", "year", "month", "day", "hour" )) %>% 
+  ggplot(aes(pressure, dep_delay)) +
+  geom_boxplot(aes(group = cut_width(pressure, 5)), na.rm=T, outlier.alpha = 0.1) +
+  ylim(-5, 350)
 
 ```
-Hours with lower visibilities seem to have a higher proportion of delays.
+
+```{r}
+flights %>% 
+    left_join(weather, by = c("origin", "year", "month", "day", "hour" )) %>% 
+    gather("weather_metric", "value", temp:visib) %>%
+    group_by(weather_metric) %>%
+    ggplot(aes(value, dep_delay)) +
+    geom_boxplot(alpha = .02, size = .5, na.rm=T) +
+    facet_wrap(~weather_metric, scales = "free")
+```
 
 5.  **What happened on June 13 2013? Display the spatial pattern of delays,
     and then use Google to cross-reference with the weather.**
@@ -480,14 +496,16 @@ flights3 %>%
 
 1.  **What does it mean for a flight to have a missing `tailnum`? What do the tail numbers that don't have a matching record in `planes` have in common?
     (Hint: one variable explains ~90% of the problems.)**
+    
 ```{r}
 flights %>%
   anti_join(planes, by = "tailnum") %>%
   count(carrier, sort = TRUE)
 ```
+
 AA and MQ seem to omit tail numbers.
 
-1.  Filter flights to only show flights with planes that have flown at least 100
+2.  Filter flights to only show flights with planes that have flown at least 100
     flights.
 ``` {r}    
 century <- flights %>%
@@ -496,12 +514,13 @@ century <- flights %>%
 century
 ```
 
-1.  Combine `fueleconomy::vehicles` and `fueleconomy::common` to find only the
+3.  Combine `fueleconomy::vehicles` and `fueleconomy::common` to find only the
     records for the most common models.
 ```{r}
 semi_join(vehicles, common)
 ```
-1.  Find the 48 hours (over the course of the whole year) that have the worst
+
+4.  Find the 48 hours (over the course of the whole year) that have the worst
     delays. Cross-reference it with the `weather` data. Can you see any
     patterns?
 
@@ -543,9 +562,10 @@ ggplot(flight_weather) +
 # All three of these variables seem to have some small correlation with delay times, especially visibility and wind speed. Further exploration could include looking at other weather measurements, especially barometric pressure. We could calculate the level correlation to better understand the strength of the connection.
 
 ```
+
 Looking at most-delayed 48-hr periods and worst 48-hr periods for visibility, precipitation and windspeed, there's no immediately obvious pattern.
 
-1.  What does `anti_join(flights, airports, by = c("dest" = "faa"))` tell you?
+5.  What does `anti_join(flights, airports, by = c("dest" = "faa"))` tell you?
 
 flights to airports not in the FAA list (foreign cities)
 
@@ -553,7 +573,7 @@ flights to airports not in the FAA list (foreign cities)
 
 US airports that received flights from nyc in 2013
 
-1.  You might expect that there's an implicit relationship between plane
+6.  You might expect that there's an implicit relationship between plane
     and airline, because each plane is flown by a single airline. Confirm
     or reject this hypothesis using the tools you've learned above.
     
