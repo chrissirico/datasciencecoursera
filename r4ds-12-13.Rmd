@@ -443,13 +443,16 @@ Planes seem to have slightly more delays at their 10-year-old phase, although th
 
 Visibility, precipitation and barrometric pressure all seem to have effects.
 
-```{r}
+```{r eval=F}
 flights %>% 
     left_join(weather, by = c("origin", "year", "month", "day", "hour" )) %>% 
     gather("weather_metric", "value", temp:visib) %>% 
     ggplot(aes(value, dep_delay)) +
     geom_point(alpha = .02, size = .5, na.rm=T) +
-    facet_wrap(~weather_metric, scales = "free")
+    facet_wrap(~weather_metric, scales = "free") # this gives an error sometimes-maybe too intensive
+#> Error in if (is.double(data$x) && !has_groups(data) && any(data$x != data$x[1L])) { : 
+#>   missing value where TRUE/FALSE needed
+# Setting eval = F
 ```
 
 Let's explore the distribution of delays within barrometric pressure:
@@ -464,14 +467,14 @@ flights %>%
 
 ```
 
-```{r}
+```{r eval = F}
 flights %>% 
     left_join(weather, by = c("origin", "year", "month", "day", "hour" )) %>% 
     gather("weather_metric", "value", temp:visib) %>%
     group_by(weather_metric) %>%
     ggplot(aes(value, dep_delay)) +
-    geom_boxplot(alpha = .02, size = .5, na.rm=T) +
-    facet_wrap(~weather_metric, scales = "free")
+    geom_boxplot(alpha = .05, size = 1, na.rm = T) +
+    facet_wrap(~ weather_metric, scales = "free") # gives same error as facet_wrap chunk above
 ```
 
 5.  **What happened on June 13 2013? Display the spatial pattern of delays,
@@ -490,6 +493,7 @@ flights3 %>%
         coord_quickmap()
 
 ```
+
     Pretty stout delays all over the eastern U.S. Google results talk about the derecho, a phenomenon that seems to cause thunderstorms.
     
 ## 13.5.1 Exercises    
@@ -507,6 +511,7 @@ AA and MQ seem to omit tail numbers.
 
 2.  Filter flights to only show flights with planes that have flown at least 100
     flights.
+    
 ``` {r}    
 century <- flights %>%
   count(tailnum) %>% 
@@ -579,7 +584,7 @@ US airports that received flights from nyc in 2013
     
     Planes seem to be shared by airlines rather often.
     
-    ``` {r}
+``` {r}
 multi_owned <- flights %>%
   group_by(tailnum) %>%
   summarise(owners = n_distinct(carrier)) %>% 
@@ -594,4 +599,4 @@ filter(flights, tailnum %in% multi_owned[["tailnum"]]) %>%
 # Delta also got planes from AirTran in October.
 # About 17 planes in this ecosystem seem to have changed hands in 2013.
   
-    ```
+```
