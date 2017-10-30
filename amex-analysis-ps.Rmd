@@ -1,6 +1,8 @@
 ---
 title: "Amex PS-to-Approval FICO & Spend"
-output: pdf_document
+output:
+  html_document: 
+    keep_md: true
 ---
 
 ```{r setup, include=FALSE}
@@ -97,15 +99,15 @@ amexps4 <- mutate(amexps3,
 ) 
 
 # using Jessica's fix:
-amexps3 %>% 
-  summarize(proportion = mean(spend_type)/mean(type_total)) %>%
-  ggplot(aes(x = spend_index)) +
-  geom_col(aes(y = spend_proportion, fill = spend_index)) +
-  scale_fill_gradient(low="#00AA00", high="#333333") +
-  facet_grid(entry_type~CardType) +
-  xlab("spend category (high to low)") +
-  ylab("proportion of approved applicants") +
-  guides(fill=FALSE) # suppress legend since x ticks are labeled
+# amexps3 %>% 
+#   summarize(proportion = mean(spend_type)/mean(type_total)) %>%
+#   ggplot(aes(x = spend_index)) +
+#   geom_col(aes(y = spend_proportion, fill = spend_index)) +
+#   scale_fill_gradient(low="#00AA00", high="#333333") +
+#   facet_grid(entry_type~CardType) +
+#   xlab("spend category (high to low)") +
+#   ylab("proportion of approved applicants") +
+#   guides(fill=FALSE) # suppress legend since x ticks are labeled
 
 
 ```
@@ -116,7 +118,7 @@ amexps3 %>%
 # I'd like to see a bar chart of proportions by card type
 # But geom_col isn't doing it
 ggplot(amexps2, aes(x = Fico_index)) +
-  geom_col(aes(y = proportion, fill = Fico_index)) +
+  geom_col(aes(y = fico_proportion, fill = Fico_index)) +
   scale_fill_gradient(low="#00AA00", high="#EE0000") +
   facet_wrap(~CardType, nrow = 1) +
   xlab("Fico category (safe to risky)") +
@@ -125,7 +127,7 @@ ggplot(amexps2, aes(x = Fico_index)) +
 # geom_bar won't cooperate either.
 # Trying stat = "identity" to override stat_count behavior. (not working)
 
-ggplot(amexps2, aes(x = Fico_index, y = proportion)) +
+ggplot(amexps2, aes(x = Fico_index, y = fico_proportion)) +
   geom_bar(aes(fill = Fico_index), stat = "identity") +
   scale_fill_gradient(low="#00AA00", high="#EE0000") +
   facet_wrap(~CardType, nrow = 1) +
@@ -134,7 +136,7 @@ ggplot(amexps2, aes(x = Fico_index, y = proportion)) +
 
 # It works with geom_point
 ggplot(amexps2, aes(x = Fico_index)) +
-  geom_point(aes(y = proportion, color = Fico_index)) +
+  geom_point(aes(y = fico_proportion, color = Fico_index)) +
   scale_color_gradient(low="#00AA00", high="#EE0000") +
   facet_wrap(~CardType, nrow = 1) +
   xlab("Fico category (safe to risky)") +
