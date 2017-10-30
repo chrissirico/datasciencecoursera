@@ -1,0 +1,143 @@
+---
+title: "Amex PS-to-Approval FICO & Spend"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(stringr)
+library(RColorBrewer)
+# set working dir where "week5example.rds" is available or copy data to amexps
+amexps <- readRDS("week5example.rds") %>%
+# tidy card names
+mutate(CardType=forcats::fct_recode(CardType, Blue="blue-for-business-credit-card",
+                                      Gold="business-gold-charge-card",
+                                      Platinum="business-platinum-charge-card",
+                                      SimplyCash="simplycashplus-business-credit-card",
+                                      Plum="the-plum-card-business-charge-card"))
+```
+
+
+## Fico index by card type
+```{r fico}
+# This makes a summary table with one row for each group
+# card_totals <-  group_by(amexps, CardType) %>%
+#   count ()
+
+
+# I want to make a CardType counts column (type_total)
+amexps2 <- group_by(amexps, CardType) %>%
+  mutate (type_total = n())
+
+# Then I want to make a fico/card column for the numerator
+amexps2 <- group_by(amexps2, Fico_index, CardType) %>%
+  mutate(fico_type = n())
+
+
+# Let's calculate the proportions of each combination as a part of it's CardType group
+amexps2 <- mutate(amexps2,
+                fico_proportion = fico_type / type_total)
+
+# using Jessica's fix:
+amexps2 %>% 
+  summarize(fico_proportion = mean(fico_type)/mean(type_total)) %>%
+  ggplot(aes(x = Fico_index)) +
+  geom_col(aes(y = fico_proportion, fill = Fico_index)) +
+  scale_fill_gradient(low="#00AA00", high="#EE0000") +
+  facet_wrap(~CardType, nrow = 1) +
+  xlab("Fico category (safe to risky)") +
+  ylab("proportion of approved applicants") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+  
+```
+
+## Spend index by card type
+```{r spend}
+# This makes a summary table with one row for each group
+# card_totals <-  group_by(amexps, CardType) %>%
+#   count ()
+
+
+# I want to make a CardType counts column (type_total)
+# Then I want to make a spend/card column for the numerator
+amexps3 <- group_by(amexps2, CardType) %>%
+  mutate (type_total = n()) %>%
+  group_by(spend_index, CardType) %>%
+  mutate(spend_type = n(),
+         spend_proportion = spend_type / type_total)
+
+# using Jessica's fix:
+amexps3 %>% 
+  summarize(spend_proportion = mean(spend_type)/mean(type_total)) %>%
+  ggplot(aes(x = spend_index)) +
+  geom_col(aes(y = spend_proportion, fill = spend_index)) +
+  scale_fill_gradient(low="#00AA00", high="#333333") +
+  facet_wrap(~CardType, nrow = 1) +
+  xlab("spend category (high to low)") +
+  ylab("proportion of approved applicants") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+  
+```
+
+## 
+```{r fig.height=5}
+amexps3$adgroup <- as.factor(amexps3$adgroup)
+
+#create a column for card_specific, gen_brand & non_brand
+amexps4 <- mutate(amexps3,
+    entry_type = as.factor(     # new column: entry_type
+          ifelse(str_detect(keyword,"platinum|gold|plum|blue|simply"),
+                      "CardSpecific",
+                        ifelse(str_detect(adgroup, "\\^B"),
+                               "GenericBrand",
+                               "NonBrand")
+                )
+     )
+) 
+
+# using Jessica's fix:
+amexps3 %>% 
+  summarize(proportion = mean(spend_type)/mean(type_total)) %>%
+  ggplot(aes(x = spend_index)) +
+  geom_col(aes(y = spend_proportion, fill = spend_index)) +
+  scale_fill_gradient(low="#00AA00", high="#333333") +
+  facet_grid(entry_type~CardType) +
+  xlab("spend category (high to low)") +
+  ylab("proportion of approved applicants") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+
+
+```
+
+```{r scraps, include=FALSE}
+# Still not totally sure why above works and these do not.
+
+# I'd like to see a bar chart of proportions by card type
+# But geom_col isn't doing it
+ggplot(amexps2, aes(x = Fico_index)) +
+  geom_col(aes(y = proportion, fill = Fico_index)) +
+  scale_fill_gradient(low="#00AA00", high="#EE0000") +
+  facet_wrap(~CardType, nrow = 1) +
+  xlab("Fico category (safe to risky)") +
+  ylab("proportion of approved applicants") 
+
+# geom_bar won't cooperate either.
+# Trying stat = "identity" to override stat_count behavior. (not working)
+
+ggplot(amexps2, aes(x = Fico_index, y = proportion)) +
+  geom_bar(aes(fill = Fico_index), stat = "identity") +
+  scale_fill_gradient(low="#00AA00", high="#EE0000") +
+  facet_wrap(~CardType, nrow = 1) +
+  xlab("Fico category (safe to risky)") +
+  ylab("proportion of approved applicants") 
+
+# It works with geom_point
+ggplot(amexps2, aes(x = Fico_index)) +
+  geom_point(aes(y = proportion, color = Fico_index)) +
+  scale_color_gradient(low="#00AA00", high="#EE0000") +
+  facet_wrap(~CardType, nrow = 1) +
+  xlab("Fico category (safe to risky)") +
+  ylab("proportion of approved applicants") 
+
+```
