@@ -1,0 +1,257 @@
+---
+title: "Amex PS-to-Approval FICO & Spend"
+output:
+  html_document: 
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(stringr)
+library(RColorBrewer)
+library(forcats)
+# set working dir where "week5example.rds" is available or copy data to amexps
+amexps <- readRDS("week5example.rds") %>%
+# tidy card names
+mutate(CardType=forcats::fct_recode(CardType, Blue="blue-for-business-credit-card",
+                                      Gold="business-gold-charge-card",
+                                      Platinum="business-platinum-charge-card",
+                                      SimplyCash="simplycashplus-business-credit-card",
+                                      Plum="the-plum-card-business-charge-card")) %>%
+mutate(CardType = fct_reorder(CardType, spend_index, fun = mean)) # Set levels by spend
+```
+
+
+## Fico index by card type
+```{r fico}
+# I want to make a CardType counts column (type_total)
+amexps2 <- group_by(amexps, CardType) %>%
+  mutate (type_total = n())
+
+# Then I want to make a fico/card column for the numerator
+amexps2 <- group_by(amexps2, Fico_index, CardType) %>%
+  mutate(fico_type = n())
+
+# Let's calculate the proportions of each combination as a part of it's CardType group
+# Jessica overrides this with a summary version before graphing (below)
+amexps2 <- mutate(amexps2, fico_proportion = fico_type / type_total)
+
+# using Jessica's fix:
+amexps2 %>% 
+  summarize(fico_proportion = mean(fico_type)/mean(type_total)) %>% 
+  ggplot(aes(Fico_index, fico_proportion)) +
+  geom_col(aes(fill = Fico_index)) +
+  scale_fill_gradient(low="#00AA00", high="#EE0000") +
+  facet_wrap(~CardType, nrow = 1) +
+  labs(title = "Approved Gold applicants have highest risk",
+       x = "Fico category (safe to risky)",
+       y = "proportion of approved applicants") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+
+```
+
+## Spend index by card type
+```{r spend}
+
+# I want to make a CardType counts column (type_total)
+# Then I want to make a spend/card column for the numerator
+amexps3 <- group_by(amexps, CardType) %>%
+  mutate (type_total = n()) %>%
+  group_by(spend_index, CardType) %>%
+  mutate(spend_type = n(),
+         spend_proportion = spend_type / type_total)
+
+# using Jessica's fix:
+amexps3 %>% 
+  summarize(spend_proportion = mean(spend_type)/mean(type_total)) %>%
+  ggplot(aes(x = spend_index)) +
+  geom_col(aes(y = spend_proportion, fill = spend_index)) +
+  scale_fill_gradient(low="#00AA00", high="#333333") +
+  facet_wrap(~CardType, nrow = 1) +
+    labs(title = "Approved Platinum applicants spend the most",
+       x = "spend category (1 = high spend)",
+       y = "proportion of approved applicants") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+  
+```
+
+## Fico index by card and entry type
+```{r fico-grid, message = FALSE}
+
+#create entry_type column for card_specific, gen_brand & non_brand
+
+amexps5 <- mutate(amexps,
+    entry_type = as.factor(     # new column: entry_type
+          ifelse(str_detect(keyword,"platinum|gold|plum|blue|simply"),
+                      "CardSpecific",
+                        ifelse(str_detect(adgroup, "\\^B"),
+                               "GenericBrand",
+                               "NonBrand")
+                )
+     )
+) 
+
+# Remake type_total & Fico_index, this time grouping by entry_type
+amexps5 <- group_by(amexps5, CardType, entry_type) %>%
+  mutate (type_total = n()) %>%
+  group_by(Fico_index, CardType, entry_type) %>%
+  mutate(fico_type = n(),
+         fico_proportion = fico_type / type_total)
+# fico_proportion probably won't work without summarizing before graphing
+
+# Allie's count-based facet grid
+amexps5 %>% 
+  group_by(entry_type, CardType, Fico_index) %>%
+  summarize(count = n()) %>% 
+  ggplot() +
+  geom_col(aes(Fico_index, count, fill = Fico_index)) +
+  scale_fill_gradient(low="#00AA00", high="#EE0000") +
+  facet_grid(entry_type ~ CardType) + 
+    labs(title = "By count: Undecided searchers end up with Gold cards",
+       x = "fico category (1 = high spend, 5 = low)",
+       y = "Counts of approved applicants by PS keyword type") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+```
+
+```{r fico-grid-proportions}
+
+# Proportions facet grid
+amexps5 %>% 
+  group_by(type_total, fico_type, entry_type, CardType, Fico_index) %>%
+  summarize(fico_proportion = mean(fico_type)/mean(type_total)
+            ) %>% 
+  # select(CardType, Fico_index, entry_type, fico_proportion) %>% #just did this to look at data going into ggplot
+  ggplot() +
+    geom_col(aes(Fico_index, fico_proportion, fill = Fico_index)) +
+    scale_fill_gradient(low="#00AA00", high="#EE0000") +
+    facet_grid(entry_type ~ CardType) +
+      labs(title = "By %: Card-specific searchers are less risky than brand-generic or non-brand",
+       x = "fico category (1 = high spend, 5 = low)",
+       y = "Counts of approved applicants by PS keyword type") +
+    guides(fill=FALSE) # suppress legend since x ticks are labeled
+```
+
+## Spend index by card and entry type
+```{r spend-grid, message = FALSE}
+#create entry_type column for card_specific, gen_brand & non_brand
+amexps4 <- mutate(amexps,
+    entry_type = as.factor(     # new column: entry_type
+          ifelse(str_detect(keyword,"platinum|gold|plum|blue|simply"),
+                      "CardSpecific",
+                        ifelse(str_detect(adgroup, "\\^B"),
+                               "GenericBrand",
+                               "NonBrand")
+                )
+     )
+) 
+
+# Remake type_total & spend_index, this time grouping by entry_type
+amexps4 <- group_by(amexps4, CardType, entry_type) %>%
+  mutate (type_total = n()) %>%
+  group_by(spend_index, CardType, entry_type) %>%
+  mutate(spend_type = n(),
+         spend_proportion = spend_type / type_total)
+# spend_proportion probably won't work without summarizing before graphing
+# 
+
+# Allie's count-based facet grid
+amexps4 %>% 
+  group_by(entry_type, CardType, spend_index) %>%
+  summarize(count = n()) %>% 
+  ggplot() +
+  geom_col(aes(spend_index, count, fill = spend_index)) +
+  scale_fill_gradient(low="#00AA00", high="#333333") +
+  facet_grid(entry_type ~ CardType) +
+      labs(title = "By count: Gold card applicants dominate",
+       x = "spend category (1 = high spend, 5 = low)",
+       y = "Counts of approved applicants by PS keyword type") +
+  xlab("spend category (1 = high spend, 5 = low)") +
+  ylab("Counts of approved applicants by PS keyword type") +
+  guides(fill=FALSE) # suppress legend since x ticks are labeled
+```
+
+
+```{r spend-grid-proportions}
+# Proportions facet grid
+amexps4 %>% 
+  group_by(type_total, spend_type, entry_type, CardType, spend_index) %>%
+  summarize(spend_proportion = mean(spend_type)/mean(type_total)
+            ) %>% #View()
+  select(CardType, spend_index, entry_type, spend_proportion) %>% 
+  ggplot() +
+    geom_col(aes(spend_index, spend_proportion, fill = spend_index)) +
+    scale_fill_gradient(low="#00AA00", high="#333333") +
+    facet_grid(entry_type ~ CardType) +
+    facet_grid(entry_type ~ CardType) +
+      labs(title = "By %: Searchers with specific terms spend more",
+       x = "spend category (1 = high spend, 5 = low)",
+       y = "Counts of approved applicants by PS keyword type") +
+    guides(fill=FALSE) # suppress legend since x ticks are labeled
+```
+
+
+***
+
+## Another look — boxplots with averages
+This is the same data as above, visualized with boxplots and open circles representing average values.
+
+```{r fico-boxplot}
+# Fico
+amexps%>%
+  ggplot(aes(CardType, Fico_index)) +
+  geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", # this adds a point for the means
+               shape=21, size=3) +
+  labs(title="Gold customers are highest-risk",
+    x="Card Type", y="Fico Index (1: Low Risk)")
+```
+
+```{r spend-boxplot}
+# Spend
+amexps%>%
+  ggplot(aes(CardType, spend_index)) +
+  geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+                                 shape=21, size=3) +
+  labs(title="Platinum cardholders spend the most",
+       x="Card Type", y="Spend Index (1: High Spend)")
+
+
+# Bonus Question ----------------------------------------------------------
+# Does the answer to the first question change depending on the keyword type the user came in on?
+
+# create column keyword_type to indicate "card_specific", "gen_brand", or "non_brand"
+amexps<- amexps%>%
+  mutate(adgroup = stringr::str_extract(adgroup, "\\^.?"),
+         searched_card = as.factor(ifelse(grepl("blue|gold|platinum|simply|cash|plum", keyword), 1, 0)),
+         keyword_type = ifelse(adgroup=="^B" & searched_card==1, "card_specific", 
+                               ifelse(adgroup=="^B" & searched_card==0, "gen_brand", "non_brand")))
+```
+
+```{r fico-entry-boxplot}
+# Fico
+amexps%>%
+  filter(!is.na(keyword_type)) %>%
+  ggplot(aes(CardType, Fico_index)) +
+  geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", # Look! Don't have to do anything special for facets.
+               shape=21, size=3) +
+  labs(title="Non-brand cardholders are riskier",
+       x="Card Type", y="Fico Index (1: Low Risk)") +
+  facet_wrap(~keyword_type, nrow=2)
+```
+
+```{r spend-entry-boxplot}
+# Spend
+amexps%>%
+  filter(!is.na(keyword_type)) %>%
+  ggplot(aes(CardType, spend_index)) +
+  geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=21, size=3) +
+  labs(title="Non-brand searchers spend less",
+       x="Card Type", y="Spend Index (1: High Spend)") +
+  facet_wrap(~keyword_type, nrow=2)
+```
+

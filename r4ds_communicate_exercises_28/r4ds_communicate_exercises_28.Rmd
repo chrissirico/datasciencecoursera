@@ -1,0 +1,130 @@
+---
+title: "R4DS ch 28 Exercises"
+author: "Chris Sirico"
+output:
+  html_document: 
+    keep_md: true
+---
+```{r setup}
+library(tidyverse)
+library(viridis)
+library(ggrepel)
+library(fueleconomy)
+```
+## 28.2.1 Exercises
+
+
+1.  **Create one plot on the fuel economy data with customised `title`,
+    `subtitle`, `caption`, `x`, `y`, and `colour` labels.**
+
+```{r with-labs message = FALSE}
+ggplot(mpg) +
+  geom_jitter(aes(hwy, cyl, color = class), width = 0.2, height = 0.2) +
+  geom_smooth(aes(hwy, cyl), se = FALSE) + 
+  labs(
+        title = "Fewer cylinders leads to better fuel economy",
+    subtitle = "4-cylinder vehicles are most numerous and thus widely distributed",
+    caption = "Data from fueleconomy.gov",
+    x = "Highway fuel economy (mpg)",
+    y = "number of cylinders",
+    color = "Car type"
+  )
+```
+
+
+2.  **The `geom_smooth()` is somewhat misleading because the `hwy` for
+    large engines is skewed upwards due to the inclusion of lightweight
+    sports cars with big engines. Use your modelling tools to fit and display
+    a better model.**
+
+```{r refit, message = FALSE}
+mpg2 <- filter(mpg, class != "2seater")
+# mpg2 <- mpg # can be used to check that line of fit changes
+
+ggplot(mpg, aes(displ,hwy)) +
+  geom_jitter(aes(color=class), width=.1, height=.1) +
+  geom_smooth(data = mpg2) +
+  labs(
+    title = "Fuel efficiency generally decreases with engine size",
+    subtitle = "Two-seaters omitted for line fitting because of their light weight",
+    caption = "Data from fueleconomy.gov"
+  )
+```
+
+3.  **Take an exploratory graphic that you've created in the last month, and add
+    informative titles to make it easier for others to understand.**
+    
+```{r}
+library(forcats)
+rincome_simple <- gss_cat
+
+rincome_simple$rincome <- fct_lump(gss_cat$rincome) %>%
+  fct_collapse(
+    "<5000" = c("Lt $1000", "$1000 to 2999", "$3000 to 3999", "$4000 to 4999"),
+    "5000-14999" = c("$5000 to 5999", "$6000 to 6999", "$7000 to 7999", "$8000 to 9999", "$10000 - 14999"),
+    "15000+" = c("$15000 - 19999", "$20000 - 24999", "$25000 or more")
+  )
+
+filter(rincome_simple, rincome == "<5000" | rincome == "5000-14999" | rincome == "15000+") %>%
+  ggplot()+
+  geom_bar(aes(rincome)) +
+  labs(
+    title = "Most respondents reported incomes greater than $15k",
+    x = "Reported income",
+    y = "Number of respondents"
+  )
+```
+
+## 28.3.1 Exercises
+
+1.  **Use `geom_text()` with infinite positions to place text at the
+    four corners of the plot.**
+    
+```{r}
+label_tr <- tibble(
+  displ = Inf,
+  hwy = Inf)
+
+label_tl <- tibble(
+  displ = -Inf,
+  hwy = Inf)
+
+label_br <- tibble(
+  displ = Inf,
+  hwy = -Inf)
+
+label_bl <- tibble(
+  displ = -Inf,
+  hwy = -Inf)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label="top right"), data=label_tr, vjust="top", hjust="right") + geom_text(aes(label="top left"), data=label_tl, vjust="top", hjust="left") + geom_text(aes(label="bottom right"), data=label_br, vjust="bottom", hjust="right") + geom_text(aes(label="bottom left"), data=label_bl, vjust="bottom", hjust="left")
+```
+
+2.  **Read the documentation for `annotate()`. How can you use it to add a text
+    label to a plot without having to create a tibble?**
+    
+Takes arguments `x =` and `y =` so you can specify individual sets of coordinates quickly.    
+```{r}
+p <- ggplot(mtcars, aes(x = wt, y = mpg)) + geom_point()
+p + annotate("text", x = 4, y = 25, label = "Some text")
+```
+
+3.  **How do labels with `geom_text()` interact with faceting? How can you
+    add a label to a single facet? How can you put a different label in
+    each facet? (Hint: think about the underlying data.)**
+    
+    
+```{r}
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point() + 
+  geom_text(aes(label = model)) +
+  facet_wrap(~ class, nrow = 2)
+```
+
+4.  **What arguments to `geom_label()` control the appearance of the background
+    box?**
+
+5.  **What are the four arguments to `arrow()`? How do they work? Create a series
+    of plots that demonstrate the most important options.**

@@ -1,0 +1,166 @@
+---
+title: "R4DS Ch 27 exercises"
+author: "Chris Sirico"
+date: "10/25/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 27.2.1 Exercises
+
+1.  **Create a new notebook using _File > New File > R Notebook_. Read the 
+    instructions. Practice running the chunks. Verify that you can modify
+    the code, re-run it, and see modified output.**
+    
+    Did it. Learned Cmd+Opt+I makes a new chunk. Cmd+Return runs the current line of code and Cmd+Shift+Return runs the whole chunk. Neat. Notebooks auto-create html files whether or not you knit to preview. Not so w/ normal RMDs.
+    
+2.  **Create a new R Markdown document with _File > New File > R Markdown..._
+    Knit it by clicking the appropriate button. Knit it by using the 
+    appropriate keyboard short cut. Verify that you can modify the
+    input and see the output update.**
+    
+    Cmd+~ switches between preview and editor windows. Along those lines ctrl+tab (mac) switches between documents in the script window. Nice to know.
+    
+3.  **Compare and contrast the R notebook and R markdown files you created
+    above. How are the outputs similar? How are they different? How are
+    the inputs similar? How are they different? What happens if you
+    copy the YAML header from one to the other?**
+    
+    Notebook doesn't show the header. Vanilla RMD knit does. output:html_document vs output:html_notebook makes the difference. Changing that field of the YAML header tells R whether to auto-generate html or not.
+
+4.  **Create one new R Markdown document for each of the three built-in
+    formats: HTML, PDF and Word. Knit each of the three documents.
+    How does the output differ? How does the input differ? (You may need
+    to install LaTeX in order to build the PDF output --- RStudio will
+    prompt you if this is necessary.)**
+    
+    Output is predictably in each of the three filetypes.
+    
+    
+```{r}
+
+```
+
+## 27.3.1 Exercises
+
+1.  **Practice what you've learned by creating a brief CV. The title should be
+    your name, and you should include headings for (at least) education or
+    employment. Each of the sections should include a bulleted list of
+    jobs/degrees. Highlight the year in bold.**
+    
+    # Chris Sirico, Marker-Downer
+    ## Education
+    - Coursera
+    - Liberal arts university, **2005 – 2008**
+    - Hard knocks
+    
+2.  **Using the R Markdown quick reference, figure out how to:**
+
+Add [^1]
+
+[^1]: a footnote.
+
+Add a horizontal rule.
+
+***
+
+> Add a block quote.
+    
+3.  **Copy and paste the contents of `diamond-sizes.Rmd` from
+    <https://github.com/hadley/r4ds/tree/master/rmarkdown> in to a local
+    R markdown document. Check that you can run it, then add text after the 
+    frequency polygon that describes its most striking features.**
+    
+    👍
+    
+## 27.4.7 Exercises
+
+1.  **Add a section that explores how diamond sizes vary by cut, colour, and clarity. Assume you’re writing a report for someone who doesn’t know R, and instead of setting echo = FALSE on each chunk, set a global option.**
+```{r}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(ggplot2)
+plot(diamonds$y, diamonds$cut)
+plot(diamonds$y, diamonds$color)
+plot(diamonds$y, diamonds$clarity)
+```
+
+2.  **Download diamond-sizes.Rmd from https://github.com/hadley/r4ds/tree/master/rmarkdown. Add a section that describes the largest 20 diamonds, including a table that displays their most important attributes.**
+
+
+```{r setup2, include = FALSE}
+library(ggplot2)
+library(dplyr)
+
+smaller <- diamonds %>% 
+  filter(carat <= 2.5)
+```
+
+We have data about `r nrow(diamonds)` diamonds. Only 
+`r nrow(diamonds) - nrow(smaller)` are larger than
+2.5 carats. The distribution of the remainder is shown
+below:
+
+```{r, echo = FALSE}
+smaller %>% 
+  ggplot(aes(carat)) + 
+  geom_freqpoly(binwidth = 0.01)
+```
+
+A synopsis of the 20 largest diamonds:
+
+```{r}
+largest <- diamonds %>% arrange(desc(diamonds$carat)) %>%
+  filter(row_number() <= 20)
+summary(largest$y)
+```
+These babies are about a centimeter in diameter! Daggum.
+
+3.  **Modify diamonds-sizes.Rmd to use comma() to produce nicely formatted output. Also include the percentage of diamonds that are larger than 2.5 carats.**
+
+
+```{r diamond-sizes-2}
+comma <- function(x) format(x, digits = 2, big.mark = ",")
+
+smaller <- diamonds %>% 
+  filter(carat <= 2.5)
+```
+
+We have data about `r comma(nrow(diamonds))` diamonds. Only 
+`r comma(nrow(diamonds) - nrow(smaller))` are larger than
+2.5 carats. The distribution of the remainder is shown
+below:
+
+```{r, echo = FALSE}
+smaller %>% 
+  ggplot(aes(carat)) + 
+  geom_freqpoly(binwidth = 0.01)
+```
+
+`r comma((nrow(diamonds) - nrow(smaller)) / nrow(diamonds)*100)` percent of diamonds are larger than 2.5 carat.
+
+4.  **Set up a network of chunks where d depends on c and b, and both b and c depend on a. Have each chunk print lubridate::now(), set cache = TRUE, then verify your understanding of caching.**
+
+```{r a, cache = TRUE}
+lubridate::now()
+```
+
+```{r b, cache = TRUE, dependson="a"}
+lubridate::now()
+```
+
+```{r c, cache = TRUE, dependson="a"}
+lubridate::now()
+```
+
+```{r d, cache = TRUE, dependson=c("b", "c")}
+lubridate::now()
+```
+
+Ah, okay. So it'll print the first time it was knit at, starting w/ a and going down the chain, unless cache = FALSE.
+
