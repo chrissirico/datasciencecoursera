@@ -52,7 +52,7 @@ ggplot(mpg, aes(displ,hwy)) +
     
 
 ```r
-library(forcats)
+require(forcats)
 rincome_simple <- gss_cat
 
 rincome_simple$rincome <- fct_lump(gss_cat$rincome) %>%
@@ -181,4 +181,74 @@ qplot(data = df, x = a, y = b) +
 ```
 <img src="r4ds_communicate_exercises_28_files/figure-html/unnamed-chunk-7-1.png" width="33%" /><img src="r4ds_communicate_exercises_28_files/figure-html/unnamed-chunk-7-2.png" width="33%" /><img src="r4ds_communicate_exercises_28_files/figure-html/unnamed-chunk-7-3.png" width="33%" />
 
-##
+## 28.4.4 Exercises
+
+1.  Why doesn't the following code override the default scale?
+
+    
+    ```r
+    df <- tibble(
+      x = rnorm(10000),
+      y = rnorm(10000)
+    )
+    
+    ggplot(df, aes(x, y)) +
+      geom_hex() +
+      scale_colour_gradient(low = "white", high = "red") +
+      coord_fixed()
+    ```
+Color scale isn't overwritten because the appropriate function would be `scale_fill_gradient()`. The coordinate scale, however, is overwritten by `coord_fixed()`.
+
+2.  What is the first argument to every scale? How does it compare to `labs()`?
+
+The first argument for every scale is `name`. Does the same thing as xlab(), for example.
+
+3.  Change the display of the presidential terms by:
+
+    1. Combining the two variants shown above.
+    2. Improving the display of the y axis.
+    3. Labelling each term with the name of the president.
+    4. Adding informative plot labels.
+    5. Placing breaks every 4 years (this is trickier than it seems!).
+    
+    
+
+```r
+presidential2 <- presidential %>%
+  mutate(id = as.integer(33 + row_number())) # Create president number
+
+# Create column w/ ordinal rank of prez # & name
+presidential2 <- presidential2 %>% 
+mutate(presidents = paste0(as.character(name), ", ", sapply(id, toOrdinal::toOrdinal)),
+       presidents = factor(presidents, levels = presidents))
+
+# Set up breaks variable for x axis (every 4 years)
+year_var <- make_date(seq(year(presidential$start[1]),year(presidential$start[length(presidential$start[])])+8, by = 4))
+
+#plot it
+ggplot(presidential2, aes(start, presidents, color = party)) +
+    geom_point() +
+    geom_segment(aes(xend = end, yend = presidents)) +
+    scale_colour_manual(values = c(Republican = "red", Democratic = "blue")) +
+    scale_y_discrete() + # labels = c(as.character(presidents))
+      scale_x_date(
+        breaks = year_var,
+        date_labels = "'%y"
+        ) +
+  labs(title = "Republicans dominate presidencies 1953–present",
+       x = "Year",
+       y = "President, nth")
+```
+
+<img src="r4ds_communicate_exercises_28_files/figure-html/unnamed-chunk-9-1.png" width="672" />
+
+4.  Use `override.aes` to make the legend on the following plot easier to see.
+
+    
+    ```r
+    ggplot(diamonds, aes(carat, price)) +
+      geom_point(aes(colour = cut), alpha = 1/20) +
+      guides(color = guide_legend(override.aes = list(alpha = 1))) # this works! right in the documentation examples, too.
+    ```
+    
+    <img src="r4ds_communicate_exercises_28_files/figure-html/unnamed-chunk-10-1.png" width="50%" />
