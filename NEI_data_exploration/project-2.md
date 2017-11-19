@@ -11,7 +11,7 @@ Emissions did, in fact, decrease steadily from '99 to '08. (Wildfires were the s
 ```r
 #create df summing emissions by year
 uspm <- NEI %>% group_by(year) %>%
-  summarise(Emissions = sum(Emissions))
+  sum_emissions
 
 bigass_df <- bigass_df %>% 
   mutate(
@@ -27,10 +27,10 @@ barplot(height = as.matrix(fire),
         col = c(1, 2),
         legend.text = c("All others", "Wildfire emissions"),
         args.legend = list(x = "topright"));
-title(main = expression('Total US PM'[2.5]*' yearly emissions (tons)')) # use cmd+shift+enter to run whole chunk and this title displays properly
+title(main = expression('Total US PM'[2.5]*' yearly emissions (tons)'))
 ```
 
-![](project-2_files/figure-html/total-US, fig_caption: true-1.png)<!-- -->
+<img src="project-2_files/figure-html/total-US, fig_caption: true-1.png" width="672" />
 
 ```r
 # graph the years 99, 02, 05, 08 (without fires)
@@ -39,10 +39,23 @@ title(main = expression('Total US PM'[2.5]*' yearly emissions (tons)')) # use cm
 # analyze per capita and by GDP.
 ```
 
+##Intervening factors
+
+
+GDP growth slowed during the dot-com bust in 2000, recovered, and then reversed at the beginning of the 2008 financial crisis. Real GDP grew by 23% over the 10 years observed, while crude oil production only increased by 12% (source: [IndexMundi](https://www.indexmundi.com/energy/?product=oil&graph=production)). The major industries of manufacturing, contruction and mining also saw increases in gross output during the period (source: [bea.gov](https://bea.gov)). This seems to suggest that emissions sources became cleaner, not less active, during the period.
+
+[See GDP history by year](https://www.thebalance.com/us-gdp-by-year-3305543).
+
+
+
+I suspect decreases in particulate emissions were in response to the [Clean Air Act](https://www.epa.gov/clean-air-act-overview/progress-cleaning-air-and-improving-peoples-health#pollution) legislation.
+
 There were some changes in the way data were collected for the 2008 version of the NEI report (some categories were flat-lined) that could lead to lower-than-expected values compared to previous years. Click the first link on this page for more information: [Air Pollutant Emissions Trends Data](https://www.epa.gov/air-emissions-inventories/air-pollutant-emissions-trends-data)
 
 
 2. **Have total emissions from PM2.5 decreased in the Baltimore City, Maryland (𝚏𝚒𝚙𝚜 == "𝟸𝟺𝟻𝟷𝟶") from 1999 to 2008? Use the base plotting system to make a plot answering this question.**
+
+Yes, emissions decreased in Baltimore.
 
 
 ```r
@@ -52,10 +65,10 @@ bcpm <- NEI %>% filter(fips == "24510") %>%
 
 # graph the years 99, 02, 05, 08
 barplot(bcpm$year, height = as.matrix(tidyr::spread(bcpm, year, Emissions)))
-title(main = expression('Total Baltimore City PM'[2.5]*' yearly emissions (tons)')) # use cmd+shift+enter to run whole chunk and this title displays properly
+title(main = expression('Total Baltimore City PM'[2.5]*' yearly emissions (tons)'))
 ```
 
-![](project-2_files/figure-html/baltimore-total-1.png)<!-- -->
+<img src="project-2_files/figure-html/baltimore-total-1.png" width="672" />
 
 
 3. **Of the four types of sources indicated by the 𝚝𝚢𝚙𝚎 (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.**
@@ -65,11 +78,19 @@ title(main = expression('Total Baltimore City PM'[2.5]*' yearly emissions (tons)
 # percent change from 99 to 08 by type in Baltimore
 bc_type <- NEI %>% filter(fips == "24510", year == 1999 | year == 2008) %>% 
   group_by(year, type) %>%
-  summarise(Emissions = sum(Emissions)) %>% ungroup() %>%
+  summarise(Emissions = sum(Emissions)) %>%
+  ungroup() %>% 
   group_by(type) %>%
   spread(year, Emissions) %>% 
   summarise(PercentChange = (`2008`-`1999`) / `1999`, # add a column showing % change from beginning to end of period
             positive = PercentChange >= 0) # create positive / negative column for bar colors
+
+# create data for emissions over time by plots (one per type)
+bc_years <- NEI %>% filter(fips == "24510") %>% 
+  group_by(year, type) %>%
+  summarise(Emissions = sum(Emissions)) %>%
+  ungroup() %>% 
+  group_by(type)
 
 ggplot(bc_type, aes(type, PercentChange)) +
   geom_col(aes(fill = positive)) +
@@ -81,13 +102,26 @@ ggplot(bc_type, aes(type, PercentChange)) +
     y = "Change from 1999 to 2008"
   ) +
   geom_text(aes(label=percent(PercentChange),
-            hjust=ifelse(sign(PercentChange)>0, 1.5, -.5)),
+            hjust=ifelse(sign(PercentChange) > 0, 1.5, -.5)),
             position = position_dodge(width=1)) +
   coord_flip() +
   guides(fill=FALSE)
 ```
 
-![](project-2_files/figure-html/unnamed-chunk-1-1.png)<!-- -->
+<img src="project-2_files/figure-html/unnamed-chunk-1-1.png" width="672" />
+
+```r
+# facet plot: emissions vs. time by type
+ggplot(bc_years, aes(year, Emissions)) +
+  geom_col() +
+  labs(title = expression('Baltimore PM'[2.5]*' emissions mostly decreased over time')) +
+  xlab("Year") +
+  ylab("Emissions (tons)") +
+  scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
+  facet_wrap(~type, nrow = 2)
+```
+
+<img src="project-2_files/figure-html/unnamed-chunk-1-2.png" width="672" />
 
 A note on **source types**:
 "POINT" refers to a fixed geographic source. "NONPOINT" refers to distributed activity, such as use of solvents or burning at multiple locations. "ON-ROAD" refers to vehicular sources (fueling, idling, and driving on roads & parking lots). "NON-ROAD" refers to emissions from use of gasoline, diesel or similar fuels by machines and vehicles not operating on roadways.
@@ -109,10 +143,12 @@ ggplot(data = bc_type_sum, aes(x = type, y = Emissions)) +
   )
 ```
 
-![](project-2_files/figure-html/baltimore-type-scale-1.png)<!-- -->
+<img src="project-2_files/figure-html/baltimore-type-scale-1.png" width="672" />
 
 
 4. **Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?**
+
+To find the data, we first search NEI dataset for all mentions of "coal", remove non-combustion categories, and finally summarize.
 
 
 ```r
@@ -169,16 +205,15 @@ ggplot(all_coal_sum, aes(year, Emissions)) +
     x = "Year",
     y = "Coal burning emissions (tons)"
   ) +
-  scale_x_continuous(breaks = c(1999, 2002, 2005, 2008), trans = "reverse") +
+  scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
   # scale_x_date(date_labels = "%y") +
   geom_text(aes(label=plyr::round_any(Emissions, 1),
-            hjust=1.2),
+            vjust=2),
             position = position_dodge(width=1), color = "white") +
-  coord_flip() +
   guides(fill=FALSE)
 ```
 
-![](project-2_files/figure-html/us-coal-1.png)<!-- -->
+<img src="project-2_files/figure-html/us-coal-1.png" width="672" />
 
 
 5. **How have emissions from motor vehicle sources changed from 1999–2008 in Baltimore City?**
@@ -201,14 +236,12 @@ ggplot(bc_cars, aes(year, Emissions)) +
   ) +
   scale_x_discrete(limits = rev(levels(all_coal_sum$year))) +
   # scale_x_date(date_labels = "%y") +
-  geom_text(aes(label=plyr::round_any(Emissions, 1),
-            hjust=2),
+  geom_text(aes(label=plyr::round_any(Emissions, 1), vjust = 2),
             position = position_dodge(width=1), color = "white") +
-  coord_flip() +
   guides(fill=FALSE)
 ```
 
-![](project-2_files/figure-html/baltimore-cars-1.png)<!-- -->
+<img src="project-2_files/figure-html/baltimore-cars-1.png" width="672" />
 
 See more about the [Clean Air Act](https://www.epa.gov/clean-air-act-overview/progress-cleaning-air-and-improving-peoples-health#pollution).
 
@@ -221,10 +254,10 @@ Population Histories:
 
 L.A. has about 10x the population of Baltimore. Let's look at changes in motor vehicle emissions by year in terms of proportion of total as well as delta from beginning to end.
 
+After in-depth analysis (see below appendix), the "on-road" category in the NEI data seems to be the right bucket.
+
 
 ```r
-# After in-depth analysis (see below appendix), on-road seems to be the right bucket. Let's drill down by those counties and by year.
-
 onroad <- bigass_df %>% filter(type == "ON-ROAD") # All "on-road" sources
 
 onroad_la <- onroad %>%
@@ -261,143 +294,128 @@ la_v_balt_density <- la_v_balt %>% group_by(year) %>%
 la_percent_change <- (la_v_balt_density[[4, "Emissions"]] - la_v_balt_density[[1, "Emissions"]]) / la_v_balt_density[[1, "Emissions"]]
 balt_percent_change <- (la_v_balt_density[[8, "Emissions"]] - la_v_balt_density[[5, "Emissions"]]) / la_v_balt_density[[5, "Emissions"]]
 
+# Plot findings
 ggplot(la_v_balt_density) +
   geom_col(aes(x = year, y = Emissions, group = City, fill = City), position="dodge", width = 2.8) +
-    scale_y_continuous(labels = scales::percent) +
-    scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) + 
-    geom_segment(x = (1999 - .7), y = la_v_balt_density$Emissions[5], xend = (2008 - .7), yend = la_v_balt_density$Emissions[8], color = "pink", lineend = "round") +
-    geom_segment(x = (1999 + .7), y = la_v_balt_density$Emissions[1], xend = (2008 + .7), yend = la_v_balt_density$Emissions[4], color = "turquoise", lineend = "round") +
-    geom_text(aes(x = year, y = Emissions, label=percent(Emissions),
-                    hjust=ifelse(City=="Baltimore", 1.1, -.2),
-                    vjust=2),
-                  position = position_dodge(width=1)) +
-   annotate("text", x = (2008 - .7), y = (.126 + .05), label = str_c((percent(balt_percent_change)), "\nchange")) +
-   annotate("text", x = (2008 + .7), y = (.243 + .05), label = str_c((percent(la_percent_change)), "\nchange"))
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) + 
+  geom_segment(
+               x = (1999 - .7),
+               y = la_v_balt_density$Emissions[5],
+               xend = (2008 - .7),
+               yend = la_v_balt_density$Emissions[8],
+               color = "pink",
+               lineend = "round"
+               ) +
+  geom_segment(x = (1999 + .7),
+               y = la_v_balt_density$Emissions[1],
+               xend = (2008 + .7),
+               yend = la_v_balt_density$Emissions[4],
+               color = "turquoise",
+               lineend = "round") +
+  labs(
+    title = expression('Baltimore vehicular PM'[2.5]*' emissions decreased while LA\'s rose'),
+    x = "Year",
+    y = "Vehicular emissions (tons)"
+  ) +
+  
+  annotate("text", x = (2002.5), y = (.42),
+           label = str_c((percent(balt_percent_change)), "\nchange\n1999-2008"),
+           color = "salmon", size = 3.5) +
+  annotate("text", x = (2001), y = (.3),
+           label = str_c((percent(la_percent_change)),"\nchange\n1999-2008"),
+           color = "#129496", size = 3.5)
 ```
 
-![](project-2_files/figure-html/la-v-balt-1.png)<!-- -->
+<img src="project-2_files/figure-html/la-v-balt-1.png" width="672" />
+
 
 ```r
-# absolute number plots, one per city (not as useful):
-# ggplot(la_v_balt) +
-#   geom_col(aes(year, LosAngeles))
-# 
-# ggplot(la_v_balt)+
-#   geom_col(aes(year, Baltimore))
+# plots by count, one per city (not as useful):
+library(gridExtra)
+
+plot1 <- ggplot(la_v_balt) +
+  geom_col(aes(year, LosAngeles)) +
+  scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
+  labs(title = expression('L.A. vehicular PM'[2.5]),
+       x = "Year",
+       y = "Emissions (tons)")
+
+plot2 <- ggplot(la_v_balt) +
+  geom_col(aes(year, Baltimore)) +
+  scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
+  labs(title = expression('Baltimore vehic. PM'[2.5]),
+       x = "Year",
+       y = "Emissions (tons)")
+
+gridExtra::grid.arrange(gridExtra::arrangeGrob(plot1, plot2, nrow=1))
 ```
+
+<img src="project-2_files/figure-html/la-balt-2col-1.png" width="672" />
 
 Baltimore has seen the bigger shift in on-road emissions, with a dramatic reduction between 1999 and 2002. The magnitude of the shift suggests a change in legislation, transit infrastructure or data collection methodology. Further investigation could help illuminate the cause of the shift.
 
 
 ## Appendix - categories exploration
 
-This section contains insights about the data uncovered during analysis of whether "on-road" is an accurate bucket for vehicular sources. Not incredibly compelling presentation, but the process was helpful in getting a handle on what was going on in the data. Interesting insights include the fact that non-road diesel equipment is responsible for more particulate than all on-road sources.
+This section contains insights about the data uncovered during analysis of whether "on-road" is an accurate bucket for vehicular sources. While this quick-and-dirty presentation isn't visual, it is included here to give an idea of the largest structural elements of the data.
+
+**Insights:** 
+
+* While gasoline- and diesel-related source categories account for a majority of the number of sources listed, they only represent 7.6% of the tonnage. Wildfires, open fires, marine vessels and coal-fired energy production are the single largest contributors by ton.
+
+* Marine vessels show more emissions in-port than underway in this data. Perhaps the EPA doesn't measure emissions outside a limited range from US land mass. Actual PM2.5 contribution to US air quality may be underepresented in this category as a result. 
+
+* Diesel as a category dominates vehicular particulate emissions with 1,225 ktons of emissions, both on-road and off-road.
+
+* Gasoline emissions are only 430 ktons, less than half those of diesel.
+
+* Non-road diesel equipment is responsible for more particulate than all on-road sources combined (606 ktons vs 580 ktons).
+
+* Iron production is another big category, as are lime production and coal mining.
+
+* Non-road gasoline sources include mostly recreational vehicles such as pleasure craft (boats), jetskis, snow mobiles and dirt bikes.
 
 
 ```r
-# onroad contains all "on-road" sources. Here are some other possible categories:
+# onroad contains all "on-road" sources (defined in la-v-balt chunk). Here are some other possible categories:
 veh <- bigass_df %>% filter(str_detect(Short.Name, "Veh")) # Everything that contains "veh" (vehicle)
 gas <- bigass_df %>% filter(str_detect(Short.Name, "Gasoline")) # Everything containing Gasoline fuel mention
 diesel <- bigass_df %>% filter(str_detect(Short.Name, "Diesel")) # Everything containing Diesel fuel mention
-# what do veh, gas and diesel have that on-road doesn't?
-# looks like "Off-highway Diesel" equipment is a substantial category
-# as is "Iron Production"
-# Diesel as a category seems to dominate high-quantity particulate emissions
 
 # Large majority of NEI sources contain either "Gasoline" or "Diesel"; each makes up a little less than half of the list
+bigass_df %>% sum_emissions() # 21.8 M tons
 onroad %>% sum_emissions() # 580k tons
-```
-
-```
-##   Emissions
-## 1  579793.2
-```
-
-```r
 veh %>% sum_emissions() #620 k tons
-```
-
-```
-##   Emissions
-## 1  618328.5
-```
-
-```r
-gas %>% sum_emissions() #430 k tons
-```
-
-```
-##   Emissions
-## 1  430435.1
-```
-
-```r
+gas %>% sum_emissions() + #430 k tons 
 diesel %>% sum_emissions() # 1,225 k tons - lots extra here compared to on-road
-```
 
-```
-##   Emissions
-## 1   1225612
-```
+# gasoline and diesel together as proportion of total pm25 emissions: 7.57%
+(gas %>% sum_emissions() + #430 k tons 
+diesel %>% sum_emissions()) / bigass_df %>% sum_emissions()
 
-```r
 # Vehicles sources not including on-road. Small category by emissions (38k tons); Iron Production, Lime Production, Coal Mining, other industrial types of sources on the high emission end
 veh_unique <- anti_join(veh, onroad)
 veh_unique %>% sum_emissions()
-```
 
-```
-##   Emissions
-## 1  38535.29
-```
-
-```r
 # Gasoline sources not including on-road. Small (23k tons); Lots of Pleasure Craft (private boats) and other small personal vehicles / equipment on the high end
 gas_unique <- anti_join(gas, onroad)
 gas_unique %>% sum_emissions()
-```
 
-```
-##   Emissions
-## 1    231984
-```
-
-```r
 # Diesel sources not on-road. Big category - 884 k tons - more than on-road!
 # Lots of diesel marine vessels on the high end; (port emissions seem to be higher than underway emissions--interesting)
 # Lesser quantities from stationary & nonroad diesel equipment, but more sources
 diesel_unique <- anti_join(diesel, onroad)
 diesel_unique %>% sum_emissions()
-```
 
-```
-##   Emissions
-## 1    844270
-```
-
-```r
 # Let's look at diesel marine vessels: 115 k tons -- does not account for the majority of unique diesel emissions
 # Non-road equipment looks like another big one once you get down past the very largest emission sources
 diesel_marine <- diesel_unique %>%
   filter(str_detect(Short.Name, "Marine Vessels"))
 diesel_marine %>% sum_emissions()
-```
 
-```
-##   Emissions
-## 1  115286.2
-```
-
-```r
-# Bingo. Non-road diesel equipment does in fact emit more fine particulate than all on-road sources combined. 600 k tons!
+# Bingo. Non-road diesel equipment does in fact emit more fine particulate than all on-road sources combined. 606 k tons!
 nr_equipment <- diesel_unique %>%
   filter(str_detect(EI.Sector, "Non-Road Equipment"))
 nr_equipment %>% sum_emissions() 
 ```
-
-```
-##   Emissions
-## 1  606203.4
-```
-
-
