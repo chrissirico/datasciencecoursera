@@ -84,6 +84,7 @@ bc_type <- NEI %>% filter(fips == "24510", year == 1999 | year == 2008) %>%
   spread(year, Emissions) %>% 
   summarise(PercentChange = (`2008`-`1999`) / `1999`, # add a column showing % change from beginning to end of period
             positive = PercentChange >= 0) # create positive / negative column for bar colors
+bc_type$type <- with(bc_type, reorder(type, PercentChange, median))
 
 # create data for emissions over time by plots (one per type)
 bc_years <- NEI %>% filter(fips == "24510") %>% 
