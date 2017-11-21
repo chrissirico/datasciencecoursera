@@ -119,8 +119,31 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 
 1. **Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the base plotting system, make a plot showing the total PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.**
 
-Emissions did, in fact, decrease steadily from '99 to '08. (Wildfires were the single greatest contributor in years '99-'05, but didn't significantly effect the trend.)
+Emissions did, in fact, decrease from '99 to '08. It seems particulate emissions were in response to the [Clean Air Act](https://www.epa.gov/clean-air-act-overview/progress-cleaning-air-and-improving-peoples-health#pollution) legislation. See below for a discussion of other intervening factors, none of which explains the decrease.
+
 ```{r total-US, fig_caption: true}
+#create df summing emissions by year
+uspm <- NEI %>% group_by(year) %>%
+  sum_emissions
+uspm$year <- as.double(uspm$year)
+uspm_spread <- spread(uspm, year, Emissions)
+
+# Base R bar plot
+barplot(uspm$year,
+        height = as.matrix(uspm_spread),
+        ylim = c(0, max(uspm$Emissions)*1.05),
+        col = "lightgray")
+lines(c(1400, 3850, 6250, 8650), uspm$Emissions, lwd = 2, col = "blue", lty = 1, type = "o", pch = 19)
+title(main = expression('Total US PM'[2.5]*' yearly emissions (tons)')) 
+
+
+```
+
+##Intervening factors
+
+Wildfires were the single greatest contributor in years '99-'05, but didn't significantly effect the trend.
+
+```{r fire, fig_caption: true}
 #create df summing emissions by year
 uspm <- NEI %>% group_by(year) %>%
   sum_emissions
@@ -146,11 +169,7 @@ title(main = expression('Total US PM'[2.5]*' yearly emissions (tons)'))
 # title(main = expression('Total US PM'[2.5]*' yearly emissions (tons)')) # use cmd+shift+enter to run whole chunk and this title displays properly
 # analyze per capita and by GDP.
 ```
-
-##Intervening factors
-
-
-GDP growth slowed during the dot-com bust in 2000, recovered, and then reversed at the beginning of the 2008 financial crisis. Real GDP grew by 23% over the 10 years observed, while crude oil production only increased by 12% (source: [IndexMundi](https://www.indexmundi.com/energy/?product=oil&graph=production)). The major industries of manufacturing, contruction and mining also saw increases in gross output during the period (source: [bea.gov](https://bea.gov)). This seems to suggest that emissions sources became cleaner, not less active, during the period.
+GDP growth slowed during the dot-com bust in 2000, recovered, and then reversed at the beginning of the 2008 financial crisis. Real GDP grew by 23% over the 10 years observed, while crude oil production increased by 12% (source: [IndexMundi](https://www.indexmundi.com/energy/?product=oil&graph=production)). The major industries of manufacturing, contruction and mining also saw steeper increases in gross output during the period (source: [bea.gov](https://bea.gov)). This seems to suggest that emissions sources became cleaner, not less active, during the period.
 
 [See GDP history by year](https://www.thebalance.com/us-gdp-by-year-3305543).
 ```{r GDP, include = FALSE}
@@ -227,9 +246,7 @@ multiplot(plot1, plot2, plot3, cols = 3)
 # scales::percent((output$Manufacturing[11] - output$Manufacturing[2]) / output$Manufacturing[2])
 ```
 
-I suspect decreases in particulate emissions were in response to the [Clean Air Act](https://www.epa.gov/clean-air-act-overview/progress-cleaning-air-and-improving-peoples-health#pollution) legislation.
-
-There were some changes in the way data were collected for the 2008 version of the NEI report (some categories were flat-lined) that could lead to lower-than-expected values compared to previous years. Click the first link on this page for more information: [Air Pollutant Emissions Trends Data](https://www.epa.gov/air-emissions-inventories/air-pollutant-emissions-trends-data)
+There were some changes in the way data were collected for the 2008 version of the NEI report (some categories were flat-lined) that could lead to lower-than-expected values compared to previous years, although these inconsistencies would be slight by comparison to the observed emissions decreases. Click the first link on this page for more information: [Air Pollutant Emissions Trends Data](https://www.epa.gov/air-emissions-inventories/air-pollutant-emissions-trends-data)
 
 
 2. **Have total emissions from PM2.5 decreased in the Baltimore City, Maryland (𝚏𝚒𝚙𝚜 == "𝟸𝟺𝟻𝟷𝟶") from 1999 to 2008? Use the base plotting system to make a plot answering this question.**
@@ -242,7 +259,11 @@ bcpm <- NEI %>% filter(fips == "24510") %>%
   summarise(Emissions = sum(Emissions))
 
 # graph the years 99, 02, 05, 08
-barplot(bcpm$year, height = as.matrix(tidyr::spread(bcpm, year, Emissions)))
+barplot(bcpm$year,
+        height = as.matrix(tidyr::spread(bcpm, year, Emissions)),
+        ylim = c(0, max(bcpm$Emissions)*1.05),
+        col = "lightgray")
+lines(c(1400, 3850, 6250, 8650), bcpm$Emissions, lwd = 2, col = "blue", lty = 1, type = "o", pch = 19)
 title(main = expression('Total Baltimore City PM'[2.5]*' yearly emissions (tons)'))
 ```
 
@@ -285,11 +306,12 @@ ggplot(bc_type, aes(type, PercentChange)) +
 
 # facet plot: emissions vs. time by type
 ggplot(bc_years, aes(year, Emissions)) +
-  geom_col() +
+  geom_col(fill="lightgray") +
   labs(title = expression('Baltimore PM'[2.5]*' emissions mostly decreased over time')) +
   xlab("Year") +
   ylab("Emissions (tons)") +
   scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
+  geom_line(color = "blue") +
   facet_wrap(~type, nrow = 2)
 ```
 
@@ -303,7 +325,9 @@ See the below graph for a sense of proportion amongst emission types in Baltimor
 ```{r baltimore-type-scale}
 bc_type_sum <- NEI %>% filter(fips == "24510") %>% 
   group_by(type) %>%
-  summarise(Emissions = sum(Emissions))
+  sum_emissions()
+
+bc_type_sum$type <- with(bc_type_sum, forcats::fct_reorder(type, Emissions, .desc = TRUE))
 
 ggplot(data = bc_type_sum, aes(x = type, y = Emissions)) +
   geom_col() +
@@ -365,7 +389,7 @@ all_coal_sum <- all_coal %>% group_by(year) %>%
 
 # And plot findings
 ggplot(all_coal_sum, aes(year, Emissions)) +
-  geom_col() +
+  geom_col(fill = "#AAAAAA") +
   labs(
     title = expression('Nationwide coal-burning PM'[2.5]*' emissions decreased \'99 - \'08'),
     x = "Year",
@@ -373,9 +397,16 @@ ggplot(all_coal_sum, aes(year, Emissions)) +
   ) +
   scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
   # scale_x_date(date_labels = "%y") +
+  geom_line(size = 1.5,
+            color = "black",
+            linetype = 1,
+            lineend = "round",
+            linejoin = "mitre"
+            ) +
+  geom_point(size = 3, color = "white") +
   geom_text(aes(label=plyr::round_any(Emissions, 1),
-            vjust=2),
-            position = position_dodge(width=1), color = "white") +
+            vjust=3),
+            position = position_dodge(width=1), color = "black") +
   guides(fill=FALSE)
 ```
 
@@ -387,20 +418,24 @@ bc_cars <- NEI %>% filter(fips == "24510" & type == "ON-ROAD") %>%
   group_by(year) %>%
   summarise(Emissions = sum(Emissions))
 
-bc_cars$year <- factor(bc_cars$year)
-
+# Plot findings
 ggplot(bc_cars, aes(year, Emissions)) +
-  geom_col() +
+  geom_col(fill = "#AAAAAA") +
   labs(
     title = expression('Baltimore vehicular PM'[2.5]*' emissions decreased dramatically \'99 - \'02'),
     subtitle = "Reductions may be driven by vehicular emissions improvements in response to Clean Air Act legislation",
     x = "Year",
     y = "Vehicular emissions (tons)"
   ) +
-  scale_x_discrete(limits = rev(levels(all_coal_sum$year))) +
-  # scale_x_date(date_labels = "%y") +
-  geom_text(aes(label=plyr::round_any(Emissions, 1), vjust = 2),
-            position = position_dodge(width=1), color = "white") +
+  # scale_x_discrete(limits = rev(levels(all_coal_sum$year))) +
+  geom_line(data = bc_cars, aes(year, Emissions),
+            size = 1.5,
+            color = "black",
+            linetype = 1) +
+  geom_point(size = 3, color = "white") +
+  geom_text(aes(label=plyr::round_any(Emissions, 1), vjust = -.7, hjust = -.7),
+            position = position_dodge(width=1), color = "black") +
+  coord_cartesian(ylim = c(0, 360)) +
   guides(fill=FALSE)
 ```
 
@@ -491,25 +526,30 @@ ggplot(la_v_balt_density) +
 # plots by count, one per city (not as useful):
 library(gridExtra)
 
-plot1 <- ggplot(la_v_balt) +
-  geom_col(aes(year, LosAngeles)) +
+plot1 <- ggplot(la_v_balt, aes(year, LosAngeles)) +
+  geom_col(aes(year, LosAngeles), fill = "lightgray") +
   scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
+  geom_line(color = "blue") +
   labs(title = expression('L.A. vehicular PM'[2.5]),
        x = "Year",
        y = "Emissions (tons)")
 
-plot2 <- ggplot(la_v_balt) +
-  geom_col(aes(year, Baltimore)) +
+plot2 <- ggplot(la_v_balt, aes(year, Baltimore)) +
+  geom_col(aes(year, Baltimore), fill = "lightgray") +
   scale_x_continuous(breaks = c(1999, 2002, 2005, 2008)) +
+  geom_line(color = "blue") +
   labs(title = expression('Baltimore vehic. PM'[2.5]),
        x = "Year",
        y = "Emissions (tons)")
 
-gridExtra::grid.arrange(gridExtra::arrangeGrob(plot1, plot2, nrow=1))
+gridExtra::grid.arrange(gridExtra::arrangeGrob(plot1, plot2, nrow = 1))
 ```
 
 Baltimore has seen the bigger shift in on-road emissions, with a dramatic reduction between 1999 and 2002. The magnitude of the shift suggests a change in legislation, transit infrastructure or data collection methodology. Further investigation could help illuminate the cause of the shift.
 
+## Conclusion: Clean Air Act has been effective
+
+Based on the data herein, it seems very likely that the Clean Air Act has contributed greatly to the downward trend in fine particulate pollution. Further exploration could compare the results herein with specific legislative requirements as they were rolled out. 
 
 ## Appendix - categories exploration
 
