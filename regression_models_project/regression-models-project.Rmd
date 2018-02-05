@@ -1,0 +1,119 @@
+---
+title: "Regression Models MPG project"
+author: "Chris Sirico"
+date: "2/5/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings = FALSE, message = FALSE)
+library(tidyverse)
+lbry<-c("grid", "gridExtra")
+lapply(lbry, require, character.only=TRUE, warn.conflicts = FALSE, quietly = TRUE)
+```
+<!--
+You work for Motor Trend, a magazine about the automobile industry. Looking at a
+data set of a collection of cars, they are interested in exploring the 
+relationship between a set of variables and miles per gallon (MPG) (outcome). 
+They are particularly interested in the following two questions:
+
+“Is an automatic or manual transmission better for MPG”
+"Quantify the MPG difference between automatic and manual transmissions"
+
+Review criteria
+
+Peer Grading
+
+The criteria that your classmates will use to evaluate and grade your work are 
+shown below. Each criteria is binary: (1 point = criteria met acceptably; 0 
+points = criteria not met acceptably)
+
+Criteria
+
+Did the student interpret the coefficients correctly?
+Did the student do some exploratory data analyses?
+Did the student fit multiple models and detail their strategy for model selection?
+Did the student answer the questions of interest or detail why the question(s) is (are) not answerable?
+Did the student do a residual plot and some diagnostics?
+Did the student quantify the uncertainty in their conclusions and/or perform an inference correctly?
+Was the report brief (about 2 pages long) for the main body of the report and no longer than 5 with supporting appendix of figures?
+Did the report include an executive summary?
+Was the report done in Rmd (knitr)?
+-->
+
+## Objective
+
+- Is an automatic or manual transmission better for MPG?
+- Quantify the MPG difference between automatic and manual transmissions.
+
+## Executive Summary
+
+The means of the data show a bias towards higher fuel economies in vehicles with manual transmissions. Those correlations, however, can be explained away by adjusting for cofounders such as weight, number of cylinders and displacement in linear regression. Transmission type does not show a statistically significant predictive effect for fuel economy.
+
+## Exploratory Analysis
+
+Using the mtcars dataset, we find automatic vehicles have lower average gas mileage than manuals, 17 mpg to 24 mpg.
+
+Note that 0 = automatic; 1 = manual.
+```{r cars}
+cars_manual_mpg <- mtcars %>%
+  group_by(am) %>%
+  summarize(mpg = mean(mpg))
+cars_manual_mpg
+```
+
+This finding is unscientific, however, because we haven't adjusted for factors like vehicle weight, number of cylinders or number of gears. We also aren't sure whether the finding is significant.
+
+Let's look at average number of cylinders, number of gears, and weight to see if those vary between our automatic and manual data points.
+
+```{r cylinders}
+cars_manual_cyl <- mtcars %>%
+  group_by(am) %>%
+  summarize(cyl = mean(cyl))
+cars_manual_cyl
+```
+A quick look confirms that automatics tend to have more cylinders. Similar exploration reveals they also have fewer speeds and more weight than manuals. We need to adjust for these factors before drawing a confident conclusion.
+
+## Linear Regression and Adjustment
+
+A quick linear regression tells us the same things as our tranmission-typed means.
+```{r linear}
+mpglm <- lm(mpg ~ am, data = mtcars)
+summary(mpglm)
+```
+
+Let's also try linear regression adjusting for other factors. Note that as soon as weight is added as a co-predictor, trans type loses statistical significance.
+
+``` {r adjustments}
+mpglm2 <- lm(mpg ~ am + wt, data = mtcars) # trans type quickly loses significance
+summary(mpglm2)
+
+mpglm3 <- lm(mpg ~ am + wt + disp, data = mtcars)
+
+mpglm4 <- lm(mpg ~ am + wt + disp + cyl, data = mtcars)
+
+mpglm5 <- lm(mpg ~ am + wt + disp + cyl + gear, data = mtcars)
+
+anova(mpglm, mpglm2, mpglm3, mpglm4, mpglm5) # adding gear count isn't significant
+```
+
+Transmission type doesn't end up being significant in the presence of other mpg predictors for this data set. Fuel economy depends more heavily on weight and engine size / number of cylinders.
+
+Analysis of variance shows significance in adding weight, displacement and number of cylinders as predictors (though not gear count).
+
+## Appendix
+
+Here's a residual plot of MPG by trans type.
+
+```{r diagnostics}
+data <- tibble(x = mtcars$am, y = summary(mpglm4)$residuals)
+
+# adapted from https://rpubs.com/therimalaya/43190
+
+ ggplot(data = data, aes(x, y)) +
+ geom_jitter(width = .03) +
+ geom_hline(yintercept=0, col="red", linetype="dashed") +
+ ggtitle("Residuals: MPG predicted by transmission type") +
+ xlab("0 = Automatic; 1 = Manual") +
+ ylab("Residual (mpg)")
+```

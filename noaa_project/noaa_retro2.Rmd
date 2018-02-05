@@ -1,0 +1,530 @@
+---
+title: "NOAA Analysis (for Reproducible Research Coursera)"
+author: "Chris Sirico"
+date: "12/26/2017"
+output: html_document
+---
+# Weather events: harm & cost
+_**Analysis of economic and human costs using NOAA storm data, years 1980-2011**_
+
+**Synopsis**
+
+This analysis aims to answer the following questions:
+
+- Across the United States, which types of events are most harmful with respect to population health?
+
+- Across the United States, which types of events have the greatest economic consequences?
+
+## Data processing
+
+The following code:
+
+- loads packages for data manipulation and display
+- reads in data
+- reformats date
+- adds a `year` column
+- sorts by date 
+- combines weather event types that can be grouped for the purposes of this analysis
+- excludes years before 1980 due to thin record keeping
+
+```{r setup, include = TRUE, message = FALSE, warning = FALSE, cache = FALSE} 
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, fig.retina = 4)
+library(here) # not necessary if .csv and this .Rmd are in working directory
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+library(ggrepel)
+library(forcats)
+
+# read in data
+storm <- read_csv("repdata%2Fdata%2FStormData.csv")
+
+# change date columns to type date
+storm$BGN_DATE <- mdy_hms(storm$BGN_DATE)
+# Limiting to 1980 and beyond
+# This excludes years with poor record keeping
+storm <- mutate(storm, 
+       year = year(BGN_DATE)) %>%
+arrange(year, BGN_DATE)
+
+# Exclude years before 1980 (Or change this value to set another threshhold)
+storm <- filter(storm, BGN_DATE >= 1980) 
+```
+
+```{r var-names, include=FALSE, eval=FALSE}
+# $ STATE__    <dbl> 1, 1, ...
+# $ BGN_DATE   <chr> "4/18/...
+# $ BGN_TIME   <chr> "0130"...
+# $ TIME_ZONE  <chr> "CST",...
+# $ COUNTY     <dbl> 97, 3,...
+# $ COUNTYNAME <chr> "MOBIL...
+# $ STATE      <chr> "AL", ...
+# $ EVTYPE     <chr> "TORNA...
+# $ BGN_RANGE  <dbl> 0, 0, ...
+# $ BGN_AZI    <chr> NA, NA...
+# $ BGN_LOCATI <chr> NA, NA...
+# $ END_DATE   <chr> NA, NA...
+# $ END_TIME   <chr> NA, NA...
+# $ COUNTY_END <dbl> 0, 0, ...
+# $ COUNTYENDN <chr> NA, NA...
+# $ END_RANGE  <dbl> 0, 0, ...
+# $ END_AZI    <chr> NA, NA...
+# $ END_LOCATI <chr> NA, NA...
+# $ LENGTH     <dbl> 14.0, ...
+# $ WIDTH      <dbl> 100, 1...
+# $ F          <int> 3, 2, ...
+# $ MAG        <dbl> 0, 0, ...
+# $ FATALITIES <dbl> 0, 0, ...
+# $ INJURIES   <dbl> 15, 0,...
+# $ PROPDMG    <dbl> 25.0, ...
+# $ PROPDMGEXP <chr> "K", "...
+# $ CROPDMG    <dbl> 0, 0, ...
+# $ CROPDMGEXP <chr> NA, NA...
+# $ WFO        <chr> NA, NA...
+# $ STATEOFFIC <chr> NA, NA...
+# $ ZONENAMES  <chr> NA, NA...
+# $ LATITUDE   <dbl> 3040, ...
+# $ LONGITUDE  <dbl> 8812, ...
+# $ LATITUDE_E <dbl> 3051, ...
+# $ LONGITUDE_ <dbl> 8806, ...
+# $ REMARKS    <chr> NA, NA...
+# $ REFNUM     <dbl> 1, 2, ...
+```
+
+```{r consolidate-levels}
+# Consolidate similar factor levels
+
+# library(dplyr) # Why is knitr making me re-library this?
+
+# HEAT
+storm$EVTYPE <- plyr::revalue(storm$EVTYPE, c(
+  "EXCESSIVE HEAT"="HEAT",
+  "EXTREME HEAT"="HEAT",
+  "Heat Wave"="HEAT",
+  "HEAT WAVE"="HEAT",
+  "RECORD HEAT"="HEAT",
+  "RECORD HEAT WAVE"="HEAT",
+  "Record High"="HEAT",
+  "Record Heat"="HEAT",
+  "RECORD HIGH"="HEAT",  
+  "RECORD HIGH TEMPERATURE"="HEAT",  
+  "RECORD/EXCESSIVE HEAT"="HEAT",  
+  "ABNORMAL WARMTH"="HEAT",
+  "Heatburst"="HEAT"
+  ))
+
+# MARINE THUNDERSTORM WIND
+storm$EVTYPE <- plyr::revalue(storm$EVTYPE, c(
+  "MARINE THUNDERSTORM WIND"="MARINE TSTM WIND"
+  ))
+
+# THUNDERSTORM WIND
+storm$EVTYPE <- as.factor(storm$EVTYPE)
+storm$EVTYPE <- plyr::revalue(storm$EVTYPE, c(
+  "TSTM WIND"="THUNDERSTORM WIND",
+  "Thunderstorm Wind"="THUNDERSTORM WIND",
+  "THUNDERSTORM WINDS" ="THUNDERSTORM WIND",
+  "SEVERE THUNDERSTORM WINDS"="THUNDERSTORM WIND",
+  "THUNDERSTORM WIND (G40)"="THUNDERSTORM WIND",
+  "THUNDERSTORM WIND 50"="THUNDERSTORM WIND",
+  "THUNDERSTORM WIND 52"="THUNDERSTORM WIND", # etc, using gsub for the rest below
+  "THUNDERSTORMW"="THUNDERSTORM WIND",
+  "THUNDERSTORMW 50"="THUNDERSTORM WIND",
+  "THUNDERSTORMWINDS"="THUNDERSTORM WIND",
+  "GUSTY THUNDERSTORM WIND"="THUNDERSTORM WIND",
+  "GUSTY THUNDERSTORM WINDS"="THUNDERSTORM WIND",
+  "TSTM WND"="THUNDERSTORM WIND",
+  "TSTMW"="THUNDERSTORM WIND",
+  
+##        🏆  Creative spelling hall of fame
+  "THUNDERESTORM WINDS"="THUNDERSTORM WIND",
+  "THUNDERSTROM WIND"="THUNDERSTORM WIND",
+  "THUNDERSTROM WINDS"="THUNDERSTORM WIND",
+  "THUNDERTSORM WIND"="THUNDERSTORM WIND",
+  "THUNERSTORM WINDS"="THUNDERSTORM WIND",
+  "THUNDEERSTORM WINDS"="THUNDERSTORM WIND",
+  "THUNDERSTORM  WINDS"="THUNDERSTORM WIND",
+  "THUNDERSTORMS WINDS"="THUNDERSTORM WIND",
+  "THUNDESTORM WINDS"="THUNDERSTORM WIND",
+  "THUNDERSTORM W INDS"="THUNDERSTORM WIND",
+  "TUNDERSTORM WIND"="THUNDERSTORM WIND",
+  "THUNDERSTORMW WINDS"="THUNDERSTORM WIND",
+  "THUNDERTORM WINDS"="THUNDERSTORM WIND",
+  "THUDERSTORM WINDS"="THUNDERSTORM WIND",
+  "THUNDERSTORMS WIND"="THUNDERSTORM WIND"
+  ))
+
+twnd <- as.character(storm$EVTYPE)
+twnd[grepl("^THUNDERSTORM WIND*", twnd, ignore.case=TRUE)] <- "THUNDERSTORM WIND"
+twnd[grepl("^TSTM WIND*", twnd, ignore.case=TRUE)] <- "THUNDERSTORM WIND"
+storm$EVTYPE <- as.factor(twnd)
+
+
+# HIGH WIND
+storm$EVTYPE <- as.factor(storm$EVTYPE)
+storm$EVTYPE <- plyr::revalue(storm$EVTYPE, c(
+  "STRONG WIND"="HIGH WIND",
+  "HIGH WINDS"="HIGH WIND",
+  "Strong Winds"="HIGH WIND",
+  "STRONG WINDS"="HIGH WIND"
+))  
+  
+# COLD/WIND CHILL
+storm$EVTYPE <- plyr::revalue(storm$EVTYPE, c(
+  "EXTREME COLD/WIND CHILL"="WIND CHILL",
+  "EXTREME WINDCHILL"="WIND CHILL",
+  "COLD/WIND CHILL"="WIND CHILL"
+))
+
+# RIP CURRENTS
+storm$EVTYPE <- plyr::revalue(storm$EVTYPE, c(
+  "RIP CURRENT"="RIP CURRENTS"
+))
+
+# used counts of most frequent events to prioritize event name consolidation
+# as.data.frame(table(storm$EVTYPE)) %>% arrange(desc(Freq))
+
+# list all levels (weather event names)
+# levels(storm$EVTYPE)
+```
+
+### Data format
+
+An **Event** is an individual type of storm event. (Thunderstorm Wind, Hail, Tornado and
+Flood are events.) Each row of the data represents an event, and the event type is specified in the `EVTYPE` variable.
+
+An **Episode** is an entire storm system and can contain many different types of events.
+
+Episodes are treated as events in the data. Episode narratives are recorded in REMARKS column, as are some event narratives. The structure of the data, however, does not include a formal tie between individual events to the episodes they are a part of.
+
+## Results
+Consider the figure below for baseline weather event frequency (as recorded in the data). These frequencies affect both deaths and economic costs inflicted by each event type as explored in the subsections below.  
+
+```{r frequent-events}
+# summarize event type by count
+event_count <- group_by(storm, EVTYPE) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+# plot weather events occurring more than 3800 times after 1980
+event_count %>% 
+  filter(count >= 4000) %>%
+ggplot() +
+  geom_col(aes(forcats::fct_reorder(EVTYPE, count, .desc = TRUE), count)) +
+# Vertical x labels
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))+
+  labs(title = "Most frequent weather events",
+       subtitle = "Events occurring more than 4000 times during the period",
+    x = "Event type",
+    y = "Event count"
+  )
+```
+
+### Human cost — deaths and injuries
+
+```{r deaths-and-injuries}
+# Set up variables for analysis of deaths and injuries
+
+# summarize event type by count
+# calculate deaths & injuries per event
+casualties_per_event <- group_by(storm, EVTYPE) %>%
+  summarize(deaths = sum(FATALITIES),
+            injuries = sum(INJURIES),
+            count = n()
+            ) %>%
+  # arrange(desc(deaths), desc(count)) %>% # This shouldn't change anything
+  # calculate casualty rates
+  mutate(
+         deaths_per_event = round(deaths / count, digits = 5),
+         injuries_per_event = round(injuries / count, digits = 5),
+         casualties_per_event = deaths_per_event + injuries_per_event
+         ) %>%
+  arrange(desc(deaths)) %>%
+  select(EVTYPE,
+         deaths,
+         injuries,
+         count,
+         deaths_per_event,
+         injuries_per_event,
+         everything()
+         )
+```
+  
+This look at casualties by events shows wind, flood and extreme temperature events are particularly hazardous.
+
+```{r top-deaths, fig.width=7, fig.height=7}
+# plot events accounting for 95% (or other threshold proportion) of casualties
+
+# set threshold for proportion of deaths to account for in plot
+threshold <- .95*sum(casualties_per_event[["deaths"]])
+
+# Prep for stacked bar plot
+stack_data_human <- casualties_per_event %>% 
+  filter(deaths >= 5 | count >= 5 | injuries >= 20) %>%    #  Exclude infrequent events
+  mutate(cumulative_deaths = cumsum(deaths),
+           cumulative_injuries = cumsum(injuries),
+           cumulative_casualties = cumulative_deaths + cumulative_injuries) %>%
+  # filter small causes of death below threshold
+    filter(cumulative_deaths <= threshold) %>%
+  select(deaths,
+         injuries,
+         cumulative_deaths,
+         cumulative_injuries,
+         cumulative_casualties,
+         count,
+         everything()
+         ) %>%
+  rename(death = deaths, injury = injuries)
+
+  # Order by deaths
+stack_data_human$EVTYPE <- forcats::fct_reorder(stack_data_human$EVTYPE,
+                                                stack_data_human$death,
+                                                .desc = TRUE)
+
+  # Gather deaths and injuries
+stack_data_human <- stack_data_human %>%
+  gather(key = casualty_type, value = casualty_count, death, injury) %>%
+  select(casualty_type,
+         casualty_count,
+         cumulative_deaths,
+         cumulative_injuries,
+         cumulative_casualties,
+         everything(),
+         -count
+         ) %>%
+    arrange(EVTYPE)
+
+# make casualty type a factor
+stack_data_human$casualty_type <- as.factor(stack_data_human$casualty_type)
+
+# reverse factor level order for casualty type (deaths as bottom of stacked bars)
+stack_data_human$casualty_type <- factor(stack_data_human$casualty_type,
+                                         levels=rev(levels(stack_data_human$casualty_type))) 
+
+
+# plot
+ggplot(stack_data_human) +
+  geom_col(aes(
+    x = EVTYPE,
+    y = casualty_count,
+    fill = casualty_type
+    )) +
+  # Vertical x labels
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+  labs(
+       title = "Tornadoes, heat and floods cause most weather casualties",
+       subtitle = "Categories shown below account for ~95% of weather-related deaths 1980-2011",
+       x = "Event type",
+       y = "Casualties",
+       fill = NULL
+      ) +
+  scale_fill_manual(labels = c("Injuries", "Deaths"), values=c("#f4d442", "#d10c02"))
+```
+
+### Economic loss — property damage & crop loss
+
+```{r costs}
+# Set up variables for analysis of economic costs
+
+# Treating PROPDMGEXP and CROPDMGEXP multipliers as described here:
+# http://rstudio-pubs-static.s3.amazonaws.com/58957_37b6723ee52b455990e149edde45e5b6.html
+# H,h = hundreds = 100
+# K,k = kilos = thousands = 1,000
+# M,m = millions = 1,000,000
+# B,b = billions = 1,000,000,000
+# (+) = 1
+# (-) = 0
+# (?) = 0
+# black/empty character = 0
+# numeric 0-8 = 10
+
+# summarize event type by count
+# calculate property damage & crop loss per event
+
+# This didn't work--chugged for a while.
+
+# cost_per_event <- storm %>%
+#   mutate(PROPDMGEXP = switch(PROPDMGEXP,
+#                              H = 100,
+#                              h = 100,
+#                              K = 1000,
+#                              k = 1000,
+#                              M = 1000000,
+#                              m = 1000000,
+#                              B = 1000000000,
+#                              b = 1000000000,
+#                              "+" = 1,
+#                              "-" = 0,
+#                              "?" = 0,
+#                              # NA = 0,
+#                              "0" = 10,
+#                              "1" = 10,
+#                              "2" = 10,
+#                              "3" = 10,
+#                              "4" = 10,
+#                              "5" = 10,
+#                              "6" = 10,
+#                              "7" = 10,
+#                              "8" = 10
+#                              )
+#          )
+
+# couldn't get this to work either
+# stuff <- function(x){
+#   x <- as.character(x);
+#   x <- gsub("H|h", 100, x);
+#   x <- gsub("K|k", 1000, x);
+#   x <- gsub("M|m", 1000000, x);
+#   x <- gsub("B|b", 1000000000, x);
+#   x <- gsub("[0-8]", 10, x);  
+#   x <- gsub("+", 1, x);
+#   x <- gsub("[-?]", 0, x);
+#   x <- gsub("NA", 0, x);
+#   x <- as.numeric(x)
+# }
+
+cost_per_event <- storm
+
+multiplier <- function(x){
+        x <- as.character(x)
+      ifelse(x == "B" | x == "b", as.numeric(1000000000),
+        ifelse(x == "M" | x == "m", as.numeric(1000000), 
+          ifelse(x == "K" | x == "k", as.numeric(1000),
+            ifelse(x == "H" | x == "h", as.numeric(100),
+              ifelse(x == "[0-8]", as.numeric(10),
+                ifelse(x == "+", as.numeric(1),
+                  ifelse(x == "\\?", as.numeric(0), 0)
+                )
+              )
+            )
+          )
+        )
+      )
+}
+
+cost_per_event$CROPDMGEXP <- multiplier(cost_per_event$CROPDMGEXP)
+cost_per_event$PROPDMGEXP <- multiplier(cost_per_event$PROPDMGEXP)
+
+# replace NAs with zeros
+cost_per_event$CROPDMGEXP[is.na(cost_per_event$CROPDMGEXP)] <- 0
+cost_per_event$PROPDMGEXP[is.na(cost_per_event$PROPDMGEXP)] <- 0
+
+cost_per_event <- cost_per_event %>%
+  mutate(prop_cost = PROPDMG * PROPDMGEXP,
+         crop_cost = CROPDMG * CROPDMGEXP,
+         cost = prop_cost + crop_cost) %>%
+  group_by(EVTYPE) %>% 
+  summarize(prop_cost = sum(prop_cost),
+            crop_cost = sum(crop_cost),
+            cost = sum(cost),
+            count = n()
+            ) %>% 
+  mutate(
+         prop_cost_per = round(prop_cost / count, digits = 15),
+         crop_cost_per = round(crop_cost / count, digits = 15),
+         cost_per = crop_cost_per + prop_cost_per
+         ) %>%
+  arrange(desc(cost)) %>%
+  select(EVTYPE,
+         cost,
+         prop_cost,
+         crop_cost,
+         count,
+         prop_cost_per,
+         crop_cost_per,
+         cost_per,
+         everything()
+         )
+```
+
+This look at costs by events shows that flood and wind events, including hurricanes and tornados, are responsible for most property damage. Drought, icing and flooding are the most costly events for crops.
+
+```{r top-costs, fig.width=7, fig.height=7}
+
+# plot events accounting for 95% (or other threshold proportion) of economic cost
+
+# set threshold for proportion of deaths to account for in plot
+threshold <- .95*sum(cost_per_event[["cost"]])
+
+# Prep for stacked bar plot
+stack_data_econ <- cost_per_event %>% 
+  filter(cost >= 250 | count >= 5 ) %>%    #  Exclude infrequent events
+  mutate(cumulative_cost = cumsum(cost),
+           cumulative_prop = cumsum(prop_cost),
+           cumulative_crop = cumsum(crop_cost)) %>%
+  # filter small costs below threshold
+    filter(cumulative_cost <= threshold) %>%
+  select(
+         prop_cost,
+         crop_cost,
+         cost,
+         cumulative_cost,
+         cumulative_prop,
+         cumulative_crop,
+         count,
+         everything()
+         )
+  # Order by cost
+stack_data_econ$EVTYPE <- forcats::fct_reorder(stack_data_econ$EVTYPE,
+                                                stack_data_econ$cost,
+                                                .desc = TRUE)
+
+  # Gather deaths and injuries
+stack_data_econ <- stack_data_econ %>%
+  gather(key = cost_type, value = costs, prop_cost, crop_cost) %>%
+  select(cost_type,
+         costs,
+         cumulative_cost,
+         cumulative_prop,
+         cumulative_crop,
+         everything(),
+         -count
+         ) %>% 
+    arrange(EVTYPE)
+
+# make cost type a factor
+stack_data_econ$cost_type <- as.factor(stack_data_econ$cost_type)
+
+# reverse factor level order for casualty type (deaths as bottom of stacked bars)
+# stack_data_econ$cost_type <- factor(stack_data_econ$cost_type,
+#                                          levels=rev(levels(stack_data_econ$cost_type))) 
+
+# plot
+ggplot(stack_data_econ) +
+  geom_col(aes(
+    x = EVTYPE,
+    y = costs,
+    fill = cost_type
+    )) +
+  # Vertical x labels
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+  labs(
+       title = "Floods are most expensive weather event",
+       subtitle = "Categories shown below account for ~95% of weather-related economic costs 1980-2011",
+       x = "Event type",
+       y = "Cost",
+       fill = NULL
+      ) +
+  scale_fill_manual(
+    labels = c("Crop loss", "Property damage"), 
+    values=c("#89aac6", "#7a715e"))
+```
+
+## Topics for further exploration
+
+This analysis is intended to give an overview of the costs of weather events nationwide. Further analysis could focus on differences over time or by geographic region.
+
+### Costs over time
+
+It might be valuable to evaluate economic and human costs per weather event over time with the goal of identifying effective and ineffective interventions as well as growing weather-related dangers.
+
+Such an analysis would be difficult with this data set, as the number and type of weather events recorded grows each year. Some incidents may appear to spike where record keeping merely improved. More intimate knowledge of the history of weather measurement & recording techniques might help account for this issue. Further analysis might focus on a single metric or subset of metrics that have been recorded in the same way for a sufficient number of years. Another alternative would be to use a more consistent source of weather data.
+
+Any analysis of costs over time should also be scaled to the change in population or industry size (scale of agricultural output, for example).
+
+### Regional analysis
+
+This analysis has been a cursory overview of the costs of weather events at a national level. More granular analysis could drill down by region, state or county. It may be beneficial to set regional priorities by focusing on the costliest or most frequent types of events by area. Code herein can be adapted to regional data by subsetting the input to the region in question.
