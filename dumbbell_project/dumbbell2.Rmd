@@ -1,0 +1,144 @@
+---
+title: "Dumbbell Form Analysis"
+author: "Chris Sirico"
+date: "3/5/2018"
+output: html_document
+---
+
+## Read in and format data
+Libraries used:
+`library(tidyverse)`
+`library(caret)`
+`library(parallel)`
+`library(doParallel)`  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, fig.retina = 4, cache = TRUE)
+library(tidyverse)
+library(caret)
+library(parallel)
+library(doParallel)
+```
+```{r readin}
+# setwd("~/Dropbox/data_science/PRACTICAL MACHINE LEARNING")
+train <- read.csv("pml-training.csv")
+test <- read.csv("pml-testing.csv")
+
+# factorize categorical variables
+train$user_name <- as.factor(train$user_name)
+test$user_name <- as.factor(test$user_name)
+train$classe <- as.factor(train$classe)
+# test$classe doesn't exist--instead it has problem_id, which duplicates X (row number)
+```
+## Remove unnecessary columns  
+Several columns have no data for most of the rows. None of these are guaranteed to be filled in our test data, and indeed none appear in the test set provided.
+```{r remove}
+# remove columns with NAs and missing values
+na_count <- sapply(train, function(y) sum(length(which(is.na(y)))))
+train <- train[,na_count==0]
+test <- test[,na_count==0]
+
+# remove first irrelevant columns but keep subject name
+train_user_name <- train$user_name
+test_user_name <- test$user_name
+train_classe <- train$classe
+train <- select(train, -1:-7)
+test <- select(test, -1:-7)
+train_copy <- train # for indexing below
+test_copy <- test # backup
+train <- train[!sapply(train, is.factor)] # nix factor cols in train (mostly empty)
+test <- test[!sapply(train_copy, is.factor)] # nix corresponding cols in test
+
+# check near zero variance cols
+nsv <- nearZeroVar(train, saveMetrics = TRUE)
+# View(nsv) # nothing has near zero variance
+```
+## View correlations between predictors & outcome  
+This step and the next (correlation matrix) could be used to prioritize and narrow features, although I ended up putting all variables into a model and then evaluating feature importance.
+
+First step is to dummy out categorial outcome variable, then view  correlations between the outcome columns and predictors.
+```{r dummy}
+# dummy out classe output variable & check correlation w/ each variable
+classe_dummy <- predict(dummyVars(~ classe, data = train_copy), newdata=train_copy)
+train_cors <- train
+train_cors[,names(as.data.frame(classe_dummy))] <- classe_dummy[,1:ncol(classe_dummy)] # append new dummy cols
+train_cors$classe <- NULL # ditch outcome var
+train_cors <- cor(train_cors)
+train_cors_names <- rownames(train_cors)
+train_cors <- mutate(as.data.frame(train_cors),
+       abs_classe_cor =
+         (abs(classe.A) +
+         abs(classe.B) +
+         abs(classe.C) +
+         abs(classe.D) +
+         abs(classe.E)))
+train_cors$row_names <- train_cors_names
+train_cors <- arrange(train_cors, desc(abs_classe_cor))
+train_cors_names <- train_cors$row_names
+train_cors <- data.table::data.table(train_cors)
+cols <- names(train_cors)[(length(train_cors)-6):(length(train_cors)-1)]
+train_cors[,(cols) := round(.SD,3), .SDcols=cols]
+train_cors <- as.data.frame(train_cors)
+train_cors$row_names <- train_cors_names
+
+print(train_cors[1:18,((length(train_cors)-6):(length(train_cors)))]) #rightmost column gives an indication of var importance
+
+```
+## Run correlation matrix among predictors to find colinearity  
+
+```{r cor-matrix}
+# filter for highly correlated variables in order to reduce dimensionality
+# make correlation matrix
+# train$classe <- NULL
+cors <- cor(train)
+d_cor_melt <- arrange(reshape2::melt(cors), -abs(value))
+high_cors <- dplyr::filter(d_cor_melt, abs(value) > .75 & value < 1) # .75 is arbitrary
+high_cors <- high_cors[!DescTools::IsOdd(as.numeric(rownames(high_cors))),]
+head(high_cors, 10)
+```
+Many variables are highly correlated. Let's look at which variables show up most often as being highly correlated with other variables.
+```{r cors-freq}
+head(
+  high_cors$Var1 %>% table() %>% sort(decreasing = TRUE), 15
+  )
+```
+While not done here, one could write a function to prioritize and eliminate variables. The function would have to prioritize which predictors to keep and eliminate those highly correlated with the retained ones. Such a function would probably have to iterate or otherwise account for which have been removed before deciding on the next.
+
+For this exercise, however, we'll move on to model and evaluate feature importance.
+
+## Model: random forest
+Because it's tree-based, random forest should be able to pick up on non linear aspects of our data. It may tend to overfit, but we can tune parameters automatically in caret using cross validation to avoid overfit models.
+
+I'm using parallel processing on my local machine to execute the following code in about 9 minutes.
+```{r rforest}
+#add back classe
+train$classe <- train_classe
+
+# 10-fold cross validation, run once with parallel processing
+rfTrainControl <- trainControl(method = "repeatedcv",
+                           number = 10, #work up to 10 
+                          repeats = 1,
+                           allowParallel = TRUE)
+
+# Set up parallel processing
+cluster <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster)
+
+# Train model (takes ~9 min on my machine with parallel processing)
+rf_fit <- train(classe ~ ., method = "rf", data = train, trControl = rfTrainControl) 
+# close cluster
+stopCluster(cluster)
+registerDoSEQ()
+``` 
+Based on ten-fold cross validation, expected out-of-sample error rate is about 99.5%.
+```{r results}
+print(rf_fit) # ~99.5% accuracy
+varImp(rf_fit) # which features helped model most?
+# print(varImp(rf_fit)$importance) #show feature importance for all features
+```
+Optimal `mtry` was 27 variables. I didn't bother to increase `ntree` beyond the caret default of 500 trees due to already-long runtime. In addition, one could tune `mtry` on values ranging between 3 and 27 to gain marginal model performance improvement. 99.5% is adequate performance for our purposes, however.
+
+## Predict on test data
+```{r predict}
+predict(rf_fit, newdata = test) 
+```
